@@ -36,7 +36,7 @@ These are validated findings, not assumptions.
 
 A Windows VPS reboot test was completed.
 
-Observed immediately after reboot:
+The initial reboot experiment established the recovery gap:
 
 - The MetaTrader 5 terminal was not running.
 - The SMA Execution Node API was not running.
@@ -59,13 +59,21 @@ Observed after manually starting the Execution Node API:
   }
   ```
 
+## Automated Reboot Recovery
+
+The Windows Native Runtime recovery flow has now been validated:
+
+- Scheduled Tasks start MT5 successfully inside the interactive Windows
+  runtime session.
+- Scheduled Tasks start the Execution Node API successfully.
+- MT5 reconnects to the persisted broker account after reboot.
+- The API reconnects successfully to the local MT5 terminal.
+- `GET /health` returns `mt5_connected=true` after reboot.
+
 ## Current Operational Gap
 
-MT5 connectivity is proven. The remaining gap is unattended startup after a
-Windows reboot.
+The next milestone is validating workstation-driven WinRM HTTPS connectivity
+from the administrator MacBook to the Windows VPS.
 
-The next investigation should validate an interactive-session startup model
-using a dedicated execution user, automatic Windows login, and Task Scheduler.
-Windows service wrappers should remain deferred until Session 0 behavior is
-explicitly proven compatible with the MT5 terminal.
-
+Windows service wrappers remain deferred because Session 0 behavior has not
+been proven compatible with the MT5 terminal IPC requirement.

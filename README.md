@@ -13,13 +13,17 @@ perform their role; this repository should not be installed on them.
 ```text
 sma-infrastructure/
 ├── README.md
+├── requirements.txt
 ├── docs/
+│   ├── ansible-workstation.md
 │   └── execution-node/
 │       ├── architecture.md
 │       ├── windows-vps.md
 │       └── findings.md
 ├── ansible/
 │   ├── inventories/
+│   │   └── production/
+│   │       └── hosts.yml
 │   ├── playbooks/
 │   └── roles/
 └── scripts/
@@ -66,8 +70,9 @@ Broker
 
 The API can retrieve account information, broker symbols, and historical
 candles. Reboot testing confirmed that broker login state persists after the
-terminal is reopened. Automatic recovery after reboot has not been configured
-yet: the MT5 terminal and Execution Node API are still started manually.
+terminal is reopened. Automatic recovery after reboot has also been validated:
+scheduled tasks start the MT5 terminal and Execution Node API inside the
+interactive Windows runtime session.
 
 See:
 
@@ -75,15 +80,42 @@ See:
 - [Windows VPS operations](docs/execution-node/windows-vps.md)
 - [Validated findings](docs/execution-node/findings.md)
 
+## Ansible Workstation
+
+Infrastructure management is executed from an administrator workstation. The
+initial control machine is the developer MacBook:
+
+```text
+MacBook
+↓ Ansible
+WinRM HTTPS
+↓
+Windows VPS
+```
+
+Create and activate a local Python environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+See [Ansible workstation setup](docs/ansible-workstation.md) for the full
+workflow and the rationale behind workstation-driven provisioning.
+
+The next infrastructure milestone is validating WinRM HTTPS connectivity from
+the MacBook to Execution Node #1. Provisioning playbooks will be added only
+after that remote-management transport is proven.
+
 ## Roadmap
 
-1. Record the manually validated Windows VPS provisioning process.
-2. Define an Ansible inventory for Execution Node #1.
+1. Validate WinRM HTTPS connectivity to Execution Node #1.
+2. Define the initial Windows provisioning playbooks.
 3. Automate Windows prerequisites, Python setup, and runtime configuration from
    the administrator workstation.
-4. Validate unattended reboot recovery for MT5 and the Execution Node API.
-5. Add monitoring, log collection, backups, and network hardening.
-6. Add Linux provisioning for SMA Portfolio Lab.
-7. Introduce centralized secrets management before scaling beyond internal
+4. Add monitoring, log collection, backups, and network hardening.
+5. Add Linux provisioning for SMA Portfolio Lab.
+6. Introduce centralized secrets management before scaling beyond internal
    infrastructure.
-

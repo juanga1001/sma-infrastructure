@@ -28,9 +28,9 @@ The following components have been installed and validated:
 - Axi demo broker account
 - Native FastAPI application served by Uvicorn
 
-## Current Manual Startup Process
+## Manual Startup Fallback
 
-After a VPS reboot:
+If automatic recovery fails after a VPS reboot:
 
 1. Sign in to Windows Server.
 2. Launch the MetaTrader 5 terminal.
@@ -74,31 +74,19 @@ GET /rates
 
 Reboot testing confirmed:
 
-- MT5 does not start automatically.
-- The Execution Node API does not start automatically.
+- Scheduled Tasks start MT5 automatically inside the interactive Windows
+  runtime session.
+- Scheduled Tasks start the Execution Node API automatically after MT5.
 - MT5 preserves the configured broker login.
-- The Execution Node API reconnects successfully after MT5 and Uvicorn are
-  started manually.
+- The Execution Node API reconnects successfully to MT5.
+- `GET /health` returns `mt5_connected=true` after reboot recovery.
 
 ## Open Questions
 
-The next operational design step is unattended reboot recovery. The leading
-candidate is:
+The native runtime and unattended reboot-recovery flow have been validated.
+Remaining operational questions include:
 
-```text
-Dedicated non-admin execution user
-↓ automatic Windows login
-Task Scheduler
-├── start MetaTrader 5 terminal
-└── start Execution Node API after MT5 is ready
-```
-
-Before implementation, validate:
-
-- the dedicated Windows execution account and permission model
-- whether automatic login is acceptable for the VPS threat model
-- the exact MT5 executable path and terminal data directory strategy
-- Task Scheduler ordering, retry behavior, and log handling
+- WinRM HTTPS connectivity from the administrator workstation
 - API network exposure, firewall allowlist, and private network design
 - HTTPS termination strategy
 - monitoring and alerting when `/health` becomes degraded
@@ -106,5 +94,5 @@ Before implementation, validate:
   database storage during its current market-data-only phase
 
 NSSM and WinSW service wrappers remain deferred until their Session 0 behavior
-is explicitly validated against the MT5 terminal IPC requirement.
-
+is explicitly validated against the MT5 terminal IPC requirement. The current
+interactive-session Scheduled Task model remains the supported runtime.

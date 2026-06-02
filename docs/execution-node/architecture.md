@@ -94,5 +94,5 @@ GET /rates
 ```
 
 Trade execution, portfolio orchestration, and multi-account operation will be
-introduced only after the Windows-native runtime is operationally stable.
-
+introduced only after the Windows-native runtime and workstation-driven
+infrastructure management are operationally stable.
