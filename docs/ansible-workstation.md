@@ -137,7 +137,13 @@ before infrastructure automation expands.
 
 ## Next Milestone
 
-WinRM HTTPS transport connectivity from the MacBook to Execution Node #1 has
-been validated. The next milestone is authenticating `win_ping` with the local
-workstation credentials. Do not add provisioning playbooks until the
-remote-management path is proven end to end.
+Authenticated WinRM HTTPS connectivity from the MacBook to Execution Node #1
+has been validated with `win_ping`. The next milestone is running the read-only
+Execution Node validation playbook:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/validate-execution-node.yml
+```

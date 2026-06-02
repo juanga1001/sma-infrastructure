@@ -4,3 +4,4 @@
 # never be committed.
 ansible_user: Administrator
 ansible_password: CHANGE_ME
+execution_node_api_key: CHANGE_ME

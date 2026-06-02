@@ -23,6 +23,7 @@ Edit `vault/execution-node.yml` locally:
 ```yaml
 ansible_user: Administrator
 ansible_password: your-local-password
+execution_node_api_key: your-local-api-key
 ```
 
 Use the local file as Ansible extra variables:

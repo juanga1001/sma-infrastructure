@@ -1,0 +1,122 @@
+---
+- name: Validate SMA Execution Node health
+  hosts: execution_nodes
+  gather_facts: false
+
+  tasks:
+    - name: Verify WinRM connectivity
+      ansible.windows.win_ping:
+
+    - name: Verify local Execution Node API key is configured
+      ansible.builtin.assert:
+        that:
+          - execution_node_api_key is defined
+          - execution_node_api_key | length > 0
+          - execution_node_api_key != "CHANGE_ME"
+        fail_msg: >-
+          execution_node_api_key is missing. Configure it in the ignored local
+          vault/execution-node.yml file.
+        quiet: true
+
+    - name: Verify SMA-MT5-Terminal scheduled task exists
+      ansible.windows.win_powershell:
+        script: |
+          $Task = Get-ScheduledTask -TaskName "SMA-MT5-Terminal" -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: SMA-MT5-Terminal"
+          }
+
+          $Ansible.Result = @{
+              name = $Task.TaskName
+              state = $Task.State.ToString()
+          }
+      register: mt5_task
+      changed_when: false
+
+    - name: Verify SMA-Execution-Node scheduled task exists
+      ansible.windows.win_powershell:
+        script: |
+          $Task = Get-ScheduledTask -TaskName "SMA-Execution-Node" -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: SMA-Execution-Node"
+          }
+
+          $Ansible.Result = @{
+              name = $Task.TaskName
+              state = $Task.State.ToString()
+          }
+      register: api_task
+      changed_when: false
+
+    - name: Verify MetaTrader 5 process is running
+      ansible.windows.win_powershell:
+        script: |
+          $Processes = @(Get-Process -Name "terminal64" -ErrorAction SilentlyContinue)
+          if ($Processes.Count -eq 0) {
+              throw "MetaTrader 5 process is not running: terminal64.exe"
+          }
+
+          $Ansible.Result = @{
+              process = "terminal64.exe"
+              count = $Processes.Count
+          }
+      register: mt5_process
+      changed_when: false
+
+    - name: Verify port 8000 is listening
+      ansible.windows.win_powershell:
+        script: |
+          $Listeners = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
+          if ($Listeners.Count -eq 0) {
+              throw "Execution Node API is not listening on port 8000"
+          }
+
+          $Ansible.Result = @{
+              port = 8000
+              listener_count = $Listeners.Count
+          }
+      register: api_port
+      changed_when: false
+
+    - name: Query Execution Node health endpoint
+      ansible.windows.win_uri:
+        url: http://localhost:8000/health
+        method: GET
+        headers:
+          X-API-Key: "{{ execution_node_api_key }}"
+        return_content: true
+        status_code: 200
+      register: health_endpoint
+      no_log: true
+
+    - name: Parse Execution Node health response
+      ansible.builtin.set_fact:
+        execution_node_health: "{{ health_endpoint.content | from_json }}"
+      no_log: true
+
+    - name: Verify Execution Node health status
+      ansible.builtin.assert:
+        that:
+          - execution_node_health.status == "ok"
+        fail_msg: "Execution Node health endpoint did not return status=ok."
+        quiet: true
+
+    - name: Verify MT5 connection status
+      ansible.builtin.assert:
+        that:
+          - execution_node_health.mt5_connected | bool
+        fail_msg: "Execution Node health endpoint reported mt5_connected=false."
+        quiet: true
+
+    - name: Print Execution Node validation summary
+      ansible.builtin.debug:
+        msg: |-
+          Execution Node Validation
+          -------------------------
+          WinRM: OK
+          MT5 Task: OK
+          API Task: OK
+          MT5 Process: OK
+          Port 8000: OK
+          Health Endpoint: OK
+          MT5 Connected: OK

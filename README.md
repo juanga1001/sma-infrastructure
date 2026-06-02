@@ -28,6 +28,7 @@ sma-infrastructure/
 │   │   └── production/
 │   │       └── hosts.yml
 │   ├── playbooks/
+│   │   └── validate-execution-node.yml
 │   └── roles/
 └── scripts/
 ```
@@ -108,10 +109,8 @@ python -m pip install -r requirements.txt
 See [Ansible workstation setup](docs/ansible-workstation.md) for the full
 workflow and the rationale behind workstation-driven provisioning.
 
-WinRM HTTPS transport connectivity from the MacBook to Execution Node #1 has
-been validated. The next milestone is authenticating `win_ping` with the local
-workstation credentials. Provisioning playbooks will be added only after that
-remote-management path is proven end to end.
+Authenticated WinRM HTTPS connectivity from the MacBook to Execution Node #1
+has been validated with `win_ping`.
 
 ## Local Secrets Management
 
@@ -138,13 +137,28 @@ See [Local workstation secrets](vault/README.md) for the current local workflow.
 Migration to `ansible-vault` is expected before infrastructure automation
 expands.
 
+## Validation Playbook
+
+Validate Execution Node health from the administrator workstation:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/validate-execution-node.yml
+```
+
+The read-only playbook verifies WinRM, runtime Scheduled Tasks, the MT5 process,
+port `8000`, the local `/health` endpoint, and MT5 connectivity. See
+[Execution Node playbooks](ansible/playbooks/README.md) for the full validation
+contract.
+
 ## Roadmap
 
-1. Validate authenticated WinRM HTTPS access to Execution Node #1.
-2. Define the initial Windows provisioning playbooks.
-3. Automate Windows prerequisites, Python setup, and runtime configuration from
+1. Validate Execution Node health from the administrator workstation.
+2. Automate Windows prerequisites, Python setup, and runtime configuration from
    the administrator workstation.
-4. Add monitoring, log collection, backups, and network hardening.
-5. Add Linux provisioning for SMA Portfolio Lab.
-6. Introduce centralized secrets management before scaling beyond internal
+3. Add monitoring, log collection, backups, and network hardening.
+4. Add Linux provisioning for SMA Portfolio Lab.
+5. Introduce centralized secrets management before scaling beyond internal
    infrastructure.
