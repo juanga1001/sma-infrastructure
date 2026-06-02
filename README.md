@@ -14,6 +14,9 @@ perform their role; this repository should not be installed on them.
 sma-infrastructure/
 ├── README.md
 ├── requirements.txt
+├── vault/
+│   ├── README.md
+│   └── execution-node.example.yml
 ├── docs/
 │   ├── ansible-workstation.md
 │   └── execution-node/
@@ -105,13 +108,39 @@ python -m pip install -r requirements.txt
 See [Ansible workstation setup](docs/ansible-workstation.md) for the full
 workflow and the rationale behind workstation-driven provisioning.
 
-The next infrastructure milestone is validating WinRM HTTPS connectivity from
-the MacBook to Execution Node #1. Provisioning playbooks will be added only
-after that remote-management transport is proven.
+WinRM HTTPS transport connectivity from the MacBook to Execution Node #1 has
+been validated. The next milestone is authenticating `win_ping` with the local
+workstation credentials. Provisioning playbooks will be added only after that
+remote-management path is proven end to end.
+
+## Local Secrets Management
+
+Local Ansible credentials belong in the ignored `vault/` directory. Create a
+local credential file from the tracked template:
+
+```bash
+cp vault/execution-node.example.yml vault/execution-node.yml
+```
+
+Populate `vault/execution-node.yml` with the workstation-managed Windows
+credentials. Do not commit that file.
+
+Use the local credentials as Ansible extra variables:
+
+```bash
+ansible execution_nodes \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  -m win_ping
+```
+
+See [Local workstation secrets](vault/README.md) for the current local workflow.
+Migration to `ansible-vault` is expected before infrastructure automation
+expands.
 
 ## Roadmap
 
-1. Validate WinRM HTTPS connectivity to Execution Node #1.
+1. Validate authenticated WinRM HTTPS access to Execution Node #1.
 2. Define the initial Windows provisioning playbooks.
 3. Automate Windows prerequisites, Python setup, and runtime configuration from
    the administrator workstation.

@@ -1,1 +1,6 @@
 .venv/
+
+vault/*
+!vault/.gitkeep
+!vault/README.md
+!vault/execution-node.example.yml

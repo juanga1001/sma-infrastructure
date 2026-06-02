@@ -115,12 +115,29 @@ Before testing connectivity, replace its placeholders with the Windows VPS host
 address and the dedicated Windows administration user. Do not commit real
 credentials.
 
-The inventory intentionally does not store a password. Supply credentials
-outside Git when running Ansible. A secrets-management workflow will be added
+The inventory intentionally does not store a password. Create a local ignored
+credential file from the tracked template:
+
+```bash
+cp vault/execution-node.example.yml vault/execution-node.yml
+```
+
+Supply the local file as Ansible extra variables:
+
+```bash
+ansible execution_nodes \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  -m win_ping
+```
+
+See [Local workstation secrets](../vault/README.md). A migration to
+`ansible-vault` or another approved secrets-management system is expected
 before infrastructure automation expands.
 
 ## Next Milestone
 
-The next milestone is validating WinRM HTTPS connectivity from the MacBook to
-Execution Node #1. Do not add provisioning playbooks until the remote-management
-transport is proven reliable.
+WinRM HTTPS transport connectivity from the MacBook to Execution Node #1 has
+been validated. The next milestone is authenticating `win_ping` with the local
+workstation credentials. Do not add provisioning playbooks until the
+remote-management path is proven end to end.
