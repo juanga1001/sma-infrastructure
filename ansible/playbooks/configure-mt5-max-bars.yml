@@ -1,0 +1,198 @@
+---
+- name: Configure MetaTrader 5 chart history depth
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    mt5_task_name: SMA-MT5-Terminal
+    execution_node_task_name: SMA-Execution-Node
+    mt5_terminal_path: C:\Program Files\MetaTrader 5\terminal64.exe
+    mt5_config_dir: C:\SMA\mt5
+    mt5_config_path: C:\SMA\mt5\sma-terminal.ini
+    mt5_max_bars: 1000000
+
+  tasks:
+    - name: Verify local Execution Node API key is configured
+      ansible.builtin.assert:
+        that:
+          - execution_node_api_key is defined
+          - execution_node_api_key | length > 0
+          - execution_node_api_key != "CHANGE_ME"
+        fail_msg: >-
+          execution_node_api_key is missing. Configure it in the ignored local
+          vault/execution-node.yml file.
+        quiet: true
+
+    - name: Verify requested MT5 MaxBars value is large enough for five years of M5 data
+      ansible.builtin.assert:
+        that:
+          - mt5_max_bars | int >= 1000000
+        fail_msg: >-
+          mt5_max_bars must be at least 1000000. This default is intended to
+          support roughly five years of M5 research history with headroom.
+        quiet: true
+
+    - name: Verify MetaTrader 5 terminal executable exists
+      ansible.windows.win_stat:
+        path: "{{ mt5_terminal_path }}"
+      register: mt5_terminal_executable
+
+    - name: Fail when MetaTrader 5 terminal executable is missing
+      ansible.builtin.assert:
+        that:
+          - mt5_terminal_executable.stat.exists
+        fail_msg: >-
+          MetaTrader 5 terminal was not found at {{ mt5_terminal_path }}.
+          Override mt5_terminal_path if this Execution Node uses another path.
+        quiet: true
+
+    - name: Ensure SMA MT5 configuration directory exists
+      ansible.windows.win_file:
+        path: "{{ mt5_config_dir }}"
+        state: directory
+
+    - name: Write SMA MT5 startup configuration
+      ansible.windows.win_copy:
+        dest: "{{ mt5_config_path }}"
+        content: |
+          [Common]
+          KeepPrivate=1
+
+          [Charts]
+          MaxBars={{ mt5_max_bars | int }}
+
+    - name: Update SMA-MT5-Terminal scheduled task to use managed config
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ mt5_task_name }}"
+          $Mt5Path = "{{ mt5_terminal_path }}"
+          $ConfigPath = "{{ mt5_config_path }}"
+
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+
+          $Action = New-ScheduledTaskAction `
+              -Execute $Mt5Path `
+              -Argument "/config:`"$ConfigPath`""
+
+          Set-ScheduledTask -TaskName $TaskName -Action $Action | Out-Null
+
+          $UpdatedTask = Get-ScheduledTask -TaskName $TaskName
+          $UpdatedAction = $UpdatedTask.Actions[0]
+
+          $Ansible.Result = @{
+              task = $TaskName
+              execute = $UpdatedAction.Execute
+              arguments = $UpdatedAction.Arguments
+          }
+
+    - name: Stop Execution Node API scheduled task
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ execution_node_task_name }}"
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+
+          if ($Task.State -eq "Running") {
+              Stop-ScheduledTask -TaskName $TaskName
+              Start-Sleep -Seconds 3
+          }
+
+          $Ansible.Result = @{
+              task = $TaskName
+              state = (Get-ScheduledTask -TaskName $TaskName).State.ToString()
+          }
+
+    - name: Stop MetaTrader 5 scheduled task and process
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ mt5_task_name }}"
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+
+          if ($Task.State -eq "Running") {
+              Stop-ScheduledTask -TaskName $TaskName
+              Start-Sleep -Seconds 3
+          }
+
+          $Processes = @(Get-Process -Name "terminal64" -ErrorAction SilentlyContinue)
+          foreach ($Process in $Processes) {
+              Stop-Process -Id $Process.Id -Force
+          }
+
+          $Ansible.Result = @{
+              task = $TaskName
+              stopped_process_count = $Processes.Count
+          }
+
+    - name: Start MetaTrader 5 scheduled task
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ mt5_task_name }}"
+          Start-ScheduledTask -TaskName $TaskName
+          Start-Sleep -Seconds 10
+
+          $Processes = @(Get-Process -Name "terminal64" -ErrorAction SilentlyContinue)
+          if ($Processes.Count -eq 0) {
+              throw "MetaTrader 5 did not start: terminal64.exe was not found."
+          }
+
+          $Ansible.Result = @{
+              task = $TaskName
+              process_count = $Processes.Count
+          }
+
+    - name: Start Execution Node API scheduled task
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ execution_node_task_name }}"
+          Start-ScheduledTask -TaskName $TaskName
+          Start-Sleep -Seconds 5
+
+          $Ansible.Result = @{
+              task = $TaskName
+              state = (Get-ScheduledTask -TaskName $TaskName).State.ToString()
+          }
+
+    - name: Wait for Execution Node health with updated MT5 MaxBars
+      ansible.windows.win_uri:
+        url: http://localhost:8000/health
+        method: GET
+        headers:
+          X-API-Key: "{{ execution_node_api_key }}"
+        return_content: true
+        status_code: 200
+      register: mt5_max_bars_health_response
+      until:
+        - mt5_max_bars_health_response.status_code is defined
+        - mt5_max_bars_health_response.status_code == 200
+        - mt5_max_bars_health_response.content is defined
+        - (mt5_max_bars_health_response.content | from_json).status == "ok"
+        - (mt5_max_bars_health_response.content | from_json).mt5_connected | bool
+        - ((mt5_max_bars_health_response.content | from_json).mt5_max_bars | int) == (mt5_max_bars | int)
+      retries: 18
+      delay: 5
+      no_log: true
+
+    - name: Store MT5 MaxBars health response
+      ansible.builtin.set_fact:
+        mt5_max_bars_health: "{{ mt5_max_bars_health_response.content | from_json }}"
+      no_log: true
+
+    - name: Print MT5 MaxBars configuration summary
+      ansible.builtin.debug:
+        msg: |-
+          MT5 MaxBars Configuration
+          -------------------------
+          Config file: {{ mt5_config_path }}
+          Scheduled task: {{ mt5_task_name }}
+          Requested MaxBars: {{ mt5_max_bars | int }}
+          Health MaxBars: {{ mt5_max_bars_health.mt5_max_bars }}
+          MT5 Connected: {{ mt5_max_bars_health.mt5_connected }}
+          Result: OK

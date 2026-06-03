@@ -160,3 +160,4 @@
           Port 8000: OK
           Health Endpoint: OK
           MT5 Connected: OK
+          MT5 MaxBars: {{ execution_node_health.mt5_max_bars | default("not reported") }}

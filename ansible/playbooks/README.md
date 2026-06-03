@@ -75,6 +75,49 @@ Profile: Any
 The rule is required because the Execution Node can be healthy locally while
 still being unreachable from Portfolio Lab if inbound TCP `8000` is blocked.
 
+## Configure MT5 MaxBars
+
+Use the MT5 chart history-depth playbook to configure the terminal for deeper
+intraday research and restart the Windows Native Runtime tasks:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/configure-mt5-max-bars.yml
+```
+
+By default, the playbook sets:
+
+```text
+MaxBars=1000000
+```
+
+This is intended to support roughly five years of M5 research history with
+headroom. The value can be overridden when needed:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  -e mt5_max_bars=1500000 \
+  ansible/playbooks/configure-mt5-max-bars.yml
+```
+
+The playbook:
+
+1. Writes `C:\SMA\mt5\sma-terminal.ini`.
+2. Sets `[Charts] MaxBars`.
+3. Updates `SMA-MT5-Terminal` to launch MT5 with `/config:...`.
+4. Stops the Execution Node API task.
+5. Stops and restarts MetaTrader 5.
+6. Starts the Execution Node API task.
+7. Waits for `/health` to report `status=ok`, `mt5_connected=true`, and the
+   requested `mt5_max_bars`.
+
+This playbook intentionally restarts MT5 because MetaTrader applies `MaxBars`
+only after a terminal restart.
+
 ## Deploy Execution Node
 
 Use the deployment playbook to update the Windows VPS from GitHub, restart the
