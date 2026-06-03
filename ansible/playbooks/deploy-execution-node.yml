@@ -128,13 +128,25 @@
               Start-Sleep -Seconds 3
           }
 
+          $ApiProcesses = @(
+              Get-CimInstance Win32_Process |
+              Where-Object {
+                  $_.CommandLine -like "*uvicorn*" -and
+                  $_.CommandLine -like "*src.main:app*"
+              }
+          )
+          foreach ($Process in $ApiProcesses) {
+              Stop-Process -Id $Process.ProcessId -Force
+          }
+
           Start-ScheduledTask -TaskName $TaskName
 
           $UpdatedTask = Get-ScheduledTask -TaskName $TaskName
 
           $Ansible.Result = @{
-              task  = $TaskName
+              task = $TaskName
               state = $UpdatedTask.State.ToString()
+              stopped_process_count = $ApiProcesses.Count
           }
 
     - name: Wait for Execution Node API readiness

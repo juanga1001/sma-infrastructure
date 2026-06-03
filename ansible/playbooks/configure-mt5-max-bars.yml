@@ -102,9 +102,21 @@
               Start-Sleep -Seconds 3
           }
 
+          $ApiProcesses = @(
+              Get-CimInstance Win32_Process |
+              Where-Object {
+                  $_.CommandLine -like "*uvicorn*" -and
+                  $_.CommandLine -like "*src.main:app*"
+              }
+          )
+          foreach ($Process in $ApiProcesses) {
+              Stop-Process -Id $Process.ProcessId -Force
+          }
+
           $Ansible.Result = @{
               task = $TaskName
               state = (Get-ScheduledTask -TaskName $TaskName).State.ToString()
+              stopped_process_count = $ApiProcesses.Count
           }
 
     - name: Stop MetaTrader 5 scheduled task and process
