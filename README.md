@@ -149,9 +149,27 @@ ansible-playbook \
 ```
 
 The read-only playbook verifies WinRM, runtime Scheduled Tasks, the MT5 process,
-port `8000`, the local `/health` endpoint, and MT5 connectivity. See
+the Windows Firewall rule for inbound TCP `8000`, the local `/health` endpoint,
+and MT5 connectivity. See
 [Execution Node playbooks](ansible/playbooks/README.md) for the full validation
 contract.
+
+## Execution Node Network Configuration
+
+Execution Nodes must allow inbound TCP traffic to the API port before Portfolio
+Lab can call `/health`, `/account`, `/symbols`, or `/rates`.
+
+Configure the Windows Firewall rule from the administrator workstation:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/configure-execution-node-network.yml
+```
+
+The deployment playbook also runs this network configuration step before
+restarting the Execution Node API.
 
 ## Roadmap
 

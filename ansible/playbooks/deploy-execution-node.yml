@@ -1,0 +1,180 @@
+---
+- import_playbook: configure-execution-node-network.yml
+
+
+- name: Deploy SMA Execution Node Windows Native Runtime
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    execution_node_git_branch: main
+    execution_node_repo_path: C:\SMA\sma-execution-node
+    execution_node_task_name: SMA-Execution-Node
+
+  tasks:
+    - name: Verify local Execution Node API key is configured
+      ansible.builtin.assert:
+        that:
+          - execution_node_api_key is defined
+          - execution_node_api_key | length > 0
+          - execution_node_api_key != "CHANGE_ME"
+        fail_msg: >-
+          execution_node_api_key is missing. Configure it in the ignored local
+          vault/execution-node.yml file.
+        quiet: true
+
+    - name: Verify Execution Node repository exists
+      ansible.windows.win_stat:
+        path: "{{ execution_node_repo_path }}"
+      register: execution_node_repo
+
+    - name: Fail when Execution Node repository is missing
+      ansible.builtin.assert:
+        that:
+          - execution_node_repo.stat.exists
+          - execution_node_repo.stat.isdir
+        fail_msg: >-
+          Execution Node repository was not found at {{ execution_node_repo_path }}.
+          Provision the repository before running deployment automation.
+        quiet: true
+
+    - name: Verify git working tree is clean
+      ansible.windows.win_command: git status --porcelain
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      register: git_status
+      changed_when: false
+
+    - name: Fail when git working tree has local modifications
+      ansible.builtin.assert:
+        that:
+          - git_status.stdout | trim | length == 0
+        fail_msg: |-
+          Execution Node working tree is not clean.
+          Refusing to deploy over local modifications:
+          {{ git_status.stdout }}
+        quiet: true
+
+    - name: Verify Git remote can authenticate non-interactively
+      ansible.windows.win_command: git ls-remote --exit-code origin
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+      changed_when: false
+
+    - name: Fetch latest remote state
+      ansible.windows.win_command: git fetch --all
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+
+    - name: Verify target branch exists on origin
+      ansible.windows.win_command: >-
+        git show-ref --verify --quiet
+        refs/remotes/origin/{{ execution_node_git_branch }}
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      changed_when: false
+
+    - name: Checkout target branch
+      ansible.windows.win_command: >-
+        git checkout -B {{ execution_node_git_branch }}
+        origin/{{ execution_node_git_branch }}
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+
+    - name: Pull latest target branch changes
+      ansible.windows.win_command: git pull origin {{ execution_node_git_branch }}
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+
+    - name: Capture deployment commit SHA
+      ansible.windows.win_command: git rev-parse HEAD
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      register: deployment_commit_sha
+      changed_when: false
+
+    - name: Capture deployment commit message
+      ansible.windows.win_command: git log --oneline -1
+      args:
+        chdir: "{{ execution_node_repo_path }}"
+      register: deployment_commit_message
+      changed_when: false
+
+    - name: Store deployment summary facts
+      ansible.builtin.set_fact:
+        deployed_execution_node_branch: "{{ execution_node_git_branch }}"
+        deployed_execution_node_commit_sha: "{{ deployment_commit_sha.stdout | trim }}"
+        deployed_execution_node_commit_message: "{{ deployment_commit_message.stdout | trim }}"
+
+    - name: Restart Execution Node scheduled task
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ execution_node_task_name }}"
+
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+
+          if ($Task.State -eq "Running") {
+              Stop-ScheduledTask -TaskName $TaskName
+              Start-Sleep -Seconds 3
+          }
+
+          Start-ScheduledTask -TaskName $TaskName
+
+          $UpdatedTask = Get-ScheduledTask -TaskName $TaskName
+
+          $Ansible.Result = @{
+              task  = $TaskName
+              state = $UpdatedTask.State.ToString()
+          }
+
+    - name: Wait for Execution Node API readiness
+      ansible.windows.win_uri:
+        url: http://localhost:8000/health
+        method: GET
+        headers:
+          X-API-Key: "{{ execution_node_api_key }}"
+        return_content: true
+        status_code: 200
+      register: deployment_health_response
+      until:
+        - deployment_health_response.status_code is defined
+        - deployment_health_response.status_code == 200
+        - deployment_health_response.content is defined
+        - (deployment_health_response.content | from_json).status == "ok"
+      retries: 12
+      delay: 5
+      no_log: true
+
+    - name: Store deployment health response
+      ansible.builtin.set_fact:
+        deployment_health: "{{ deployment_health_response.content | from_json }}"
+      no_log: true
+
+
+- import_playbook: validate-execution-node.yml
+
+
+- name: Print SMA Execution Node deployment summary
+  hosts: execution_nodes
+  gather_facts: false
+
+  tasks:
+    - name: Print deployment summary
+      ansible.builtin.debug:
+        msg: |-
+          Deployment Successful
+          Branch: {{ deployed_execution_node_branch }}
+          Commit: {{ deployed_execution_node_commit_sha }}
+          Message: {{ deployed_execution_node_commit_message }}
+          Health: {{ execution_node_health.status | default(deployment_health.status) | upper }}
+          Result: OK

@@ -1,0 +1,58 @@
+---
+- name: Configure SMA Execution Node network access
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    execution_node_api_port: 8000
+    execution_node_api_firewall_rule_name: SMA Execution Node API 8000
+
+  tasks:
+    - name: Allow inbound SMA Execution Node API traffic
+      ansible.windows.win_powershell:
+        script: |
+          $RuleName = "{{ execution_node_api_firewall_rule_name }}"
+          $Port = "{{ execution_node_api_port }}"
+          $Rules = @(Get-NetFirewallRule -DisplayName $RuleName -ErrorAction SilentlyContinue)
+          $IsExpected = $false
+
+          if ($Rules.Count -eq 1) {
+              $Rule = $Rules[0]
+              $PortFilters = @(Get-NetFirewallPortFilter -AssociatedNetFirewallRule $Rule)
+
+              $IsExpected = (
+                  $Rule.Enabled -eq "True" -and
+                  $Rule.Direction -eq "Inbound" -and
+                  $Rule.Action -eq "Allow" -and
+                  $PortFilters.Count -eq 1 -and
+                  $PortFilters[0].Protocol -eq "TCP" -and
+                  $PortFilters[0].LocalPort -eq $Port
+              )
+          }
+
+          if (-not $IsExpected) {
+              foreach ($Rule in $Rules) {
+                  Remove-NetFirewallRule -Name $Rule.Name
+              }
+
+              New-NetFirewallRule `
+                  -DisplayName $RuleName `
+                  -Direction Inbound `
+                  -Protocol TCP `
+                  -LocalPort $Port `
+                  -Action Allow `
+                  -Profile Any | Out-Null
+
+              $Ansible.Changed = $true
+          }
+          else {
+              $Ansible.Changed = $false
+          }
+
+          $Ansible.Result = @{
+              rule = $RuleName
+              port = $Port
+              protocol = "TCP"
+              direction = "Inbound"
+              action = "Allow"
+          }
