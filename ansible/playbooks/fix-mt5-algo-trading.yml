@@ -1,0 +1,170 @@
+---
+- name: Fix MT5 algo trading and recover Execution Node
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    mt5_task_name: SMA-MT5-Terminal
+    execution_node_task_name: SMA-Execution-Node
+    execution_node_repo_path: C:\SMA\sma-execution-node
+    mt5_terminal_path: C:\Program Files\MetaTrader 5\terminal64.exe
+    mt5_config_path: C:\SMA\mt5\sma-terminal.ini
+
+  tasks:
+    - name: Patch MetaTrader common.ini Expert settings
+      ansible.windows.win_powershell:
+        script: |
+          function Set-IniSectionValue {
+              param(
+                  [string]$Path,
+                  [string]$Section,
+                  [string]$Key,
+                  [string]$Value
+              )
+
+              $lines = @(Get-Content -Path $Path -ErrorAction Stop)
+              $sectionIndex = [array]::IndexOf(
+                  $lines,
+                  ($lines | Where-Object { $_ -eq "[$Section]" } | Select-Object -First 1)
+              )
+
+              if ($sectionIndex -lt 0) {
+                  if ($lines.Count -gt 0 -and $lines[-1].Trim().Length -gt 0) {
+                      $lines += ""
+                  }
+                  $lines += "[$Section]"
+                  $lines += "$Key=$Value"
+                  Set-Content -Path $Path -Value $lines -Encoding ASCII
+                  return
+              }
+
+              $nextSectionIndex = $lines.Length
+              for ($index = $sectionIndex + 1; $index -lt $lines.Length; $index++) {
+                  if ($lines[$index] -match '^\[.+\]$') {
+                      $nextSectionIndex = $index
+                      break
+                  }
+              }
+
+              $keyPattern = "^\s*$([regex]::Escape($Key))\s*="
+              $updated = $false
+              for ($index = $sectionIndex + 1; $index -lt $nextSectionIndex; $index++) {
+                  if ($lines[$index] -match $keyPattern) {
+                      $lines[$index] = "$Key=$Value"
+                      $updated = $true
+                      break
+                  }
+              }
+
+              if (-not $updated) {
+                  $insertAt = $nextSectionIndex
+                  $before = $lines[0..($insertAt - 1)]
+                  $after = @()
+                  if ($insertAt -lt $lines.Length) {
+                      $after = $lines[$insertAt..($lines.Length - 1)]
+                  }
+                  $lines = @($before + "$Key=$Value" + $after)
+              }
+
+              Set-Content -Path $Path -Value $lines -Encoding ASCII
+          }
+
+          $ConfigRoot = Join-Path $env:APPDATA "MetaQuotes\Terminal"
+          $UpdatedFiles = @()
+
+          Get-ChildItem $ConfigRoot -Directory | ForEach-Object {
+              $CommonIni = Join-Path $_.FullName "config\common.ini"
+              if (-not (Test-Path $CommonIni -PathType Leaf)) {
+                  return
+              }
+
+              Set-IniSectionValue -Path $CommonIni -Section "Experts" -Key "Enabled" -Value "1"
+              Set-IniSectionValue -Path $CommonIni -Section "Experts" -Key "AllowLiveTrading" -Value "1"
+              Set-IniSectionValue -Path $CommonIni -Section "Experts" -Key "Account" -Value "0"
+              Set-IniSectionValue -Path $CommonIni -Section "Experts" -Key "Profile" -Value "0"
+              $UpdatedFiles += $CommonIni
+          }
+
+          if ($UpdatedFiles.Count -eq 0) {
+              throw "No MetaTrader common.ini files were found under $ConfigRoot"
+          }
+
+          $Ansible.Result = @{
+              updated_files = $UpdatedFiles
+          }
+
+    - name: Restart MetaTrader 5
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ mt5_task_name }}"
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+
+          if ($Task.State -eq "Running") {
+              Stop-ScheduledTask -TaskName $TaskName
+              Start-Sleep -Seconds 3
+          }
+
+          foreach ($Process in @(Get-Process -Name "terminal64" -ErrorAction SilentlyContinue)) {
+              Stop-Process -Id $Process.Id -Force
+          }
+
+          Start-ScheduledTask -TaskName $TaskName
+          Start-Sleep -Seconds 20
+
+          if (@(Get-Process -Name "terminal64" -ErrorAction SilentlyContinue).Count -eq 0) {
+              throw "MetaTrader 5 did not start."
+          }
+
+    - name: Start Execution Node API
+      ansible.windows.win_powershell:
+        script: |
+          Start-ScheduledTask -TaskName "{{ execution_node_task_name }}"
+          Start-Sleep -Seconds 8
+
+    - name: Wait for Execution Node health
+      ansible.windows.win_uri:
+        url: http://localhost:8000/health
+        method: GET
+        headers:
+          X-API-Key: "{{ execution_node_api_key }}"
+        return_content: true
+        status_code: 200
+      register: health_response
+      until:
+        - health_response.status_code is defined
+        - health_response.status_code == 200
+        - (health_response.content | from_json).status == "ok"
+      retries: 18
+      delay: 5
+      no_log: true
+
+    - name: Verify MetaTrader algo trading is enabled
+      ansible.windows.win_powershell:
+        script: |
+          Push-Location "{{ execution_node_repo_path }}"
+          try {
+              $output = & py -3.11 -m poetry run python -c "import MetaTrader5 as mt5; ok = mt5.initialize(path=r'{{ mt5_terminal_path }}'); terminal = mt5.terminal_info() if ok else None; print('enabled=' + ('1' if terminal and terminal.trade_allowed else '0')); mt5.shutdown()"
+          }
+          finally {
+              Pop-Location
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "MetaTrader verification command failed with exit code $LASTEXITCODE"
+          }
+
+          if ($output -notmatch 'enabled=1') {
+              throw "MetaTrader algo trading is still disabled: $output"
+          }
+
+          $Ansible.Result = @{ output = $output.Trim() }
+
+    - name: Print recovery summary
+      ansible.builtin.debug:
+        msg: |-
+          MT5 algo trading recovery complete.
+          Algo trading enabled: true
+          Execution Node health: OK

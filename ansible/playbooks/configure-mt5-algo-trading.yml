@@ -1,11 +1,12 @@
 ---
-- name: Configure MetaTrader 5 chart history depth
+- name: Enable MetaTrader 5 algorithmic trading on the Execution Node
   hosts: execution_nodes
   gather_facts: false
 
   vars:
     mt5_task_name: SMA-MT5-Terminal
     execution_node_task_name: SMA-Execution-Node
+    execution_node_repo_path: C:\SMA\sma-execution-node
     mt5_terminal_path: C:\Program Files\MetaTrader 5\terminal64.exe
     mt5_config_dir: C:\SMA\mt5
     mt5_config_path: C:\SMA\mt5\sma-terminal.ini
@@ -23,15 +24,6 @@
           vault/execution-node.yml file.
         quiet: true
 
-    - name: Verify requested MT5 MaxBars value is large enough for five years of M5 data
-      ansible.builtin.assert:
-        that:
-          - mt5_max_bars | int >= 1000000
-        fail_msg: >-
-          mt5_max_bars must be at least 1000000. This default is intended to
-          support roughly five years of M5 research history with headroom.
-        quiet: true
-
     - name: Verify MetaTrader 5 terminal executable exists
       ansible.windows.win_stat:
         path: "{{ mt5_terminal_path }}"
@@ -43,7 +35,6 @@
           - mt5_terminal_executable.stat.exists
         fail_msg: >-
           MetaTrader 5 terminal was not found at {{ mt5_terminal_path }}.
-          Override mt5_terminal_path if this Execution Node uses another path.
         quiet: true
 
     - name: Ensure SMA MT5 configuration directory exists
@@ -51,7 +42,7 @@
         path: "{{ mt5_config_dir }}"
         state: directory
 
-    - name: Write SMA MT5 startup configuration
+    - name: Write SMA MT5 startup configuration with algo trading enabled
       ansible.windows.win_copy:
         dest: "{{ mt5_config_path }}"
         content: |
@@ -86,15 +77,6 @@
 
           Set-ScheduledTask -TaskName $TaskName -Action $Action | Out-Null
 
-          $UpdatedTask = Get-ScheduledTask -TaskName $TaskName
-          $UpdatedAction = $UpdatedTask.Actions[0]
-
-          $Ansible.Result = @{
-              task = $TaskName
-              execute = $UpdatedAction.Execute
-              arguments = $UpdatedAction.Arguments
-          }
-
     - name: Stop Execution Node API scheduled task
       ansible.windows.win_powershell:
         script: |
@@ -120,13 +102,7 @@
               Stop-Process -Id $Process.ProcessId -Force
           }
 
-          $Ansible.Result = @{
-              task = $TaskName
-              state = (Get-ScheduledTask -TaskName $TaskName).State.ToString()
-              stopped_process_count = $ApiProcesses.Count
-          }
-
-    - name: Stop MetaTrader 5 scheduled task and process
+    - name: Restart MetaTrader 5 scheduled task
       ansible.windows.win_powershell:
         script: |
           $TaskName = "{{ mt5_task_name }}"
@@ -145,15 +121,6 @@
               Stop-Process -Id $Process.Id -Force
           }
 
-          $Ansible.Result = @{
-              task = $TaskName
-              stopped_process_count = $Processes.Count
-          }
-
-    - name: Start MetaTrader 5 scheduled task
-      ansible.windows.win_powershell:
-        script: |
-          $TaskName = "{{ mt5_task_name }}"
           Start-ScheduledTask -TaskName $TaskName
           Start-Sleep -Seconds 10
 
@@ -162,10 +129,70 @@
               throw "MetaTrader 5 did not start: terminal64.exe was not found."
           }
 
-          $Ansible.Result = @{
-              task = $TaskName
-              process_count = $Processes.Count
+    - name: Enable MetaTrader algo trading toolbar toggle
+      ansible.windows.win_powershell:
+        script: |
+          Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class NativeMethods {
+              [DllImport("user32.dll", SetLastError=true)]
+              public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+              [DllImport("user32.dll", SetLastError=true)]
+              public static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
           }
+          "@
+
+          function Test-Mt5AlgoTradingEnabled {
+              Push-Location "{{ execution_node_repo_path }}"
+              try {
+                  $output = & py -3.11 -m poetry run python -c @"
+          import MetaTrader5 as mt5
+
+          if not mt5.initialize():
+              raise SystemExit(2)
+
+          terminal = mt5.terminal_info()
+          enabled = bool(terminal and terminal.trade_allowed)
+          print(1 if enabled else 0)
+          mt5.shutdown()
+          "@
+                  return [int]::Parse($output.Trim()) -eq 1
+              }
+              finally {
+                  Pop-Location
+              }
+          }
+
+          if (Test-Mt5AlgoTradingEnabled) {
+              $Ansible.Result = @{ already_enabled = $true }
+              return
+          }
+
+          $process = Get-Process -Name "terminal64" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $process) {
+              throw "MetaTrader 5 is not running."
+          }
+
+          $handle = $process.MainWindowHandle
+          if ($handle -eq [IntPtr]::Zero) {
+              throw "MetaTrader 5 main window handle is unavailable."
+          }
+
+          $mainWindow = [NativeMethods]::GetAncestor($handle, 2)
+          [void][NativeMethods]::PostMessage(
+              $mainWindow,
+              0x0111,
+              [IntPtr]32851,
+              [IntPtr]::Zero
+          )
+          Start-Sleep -Seconds 2
+
+          if (-not (Test-Mt5AlgoTradingEnabled)) {
+              throw "MetaTrader algo trading is still disabled after toggle attempt."
+          }
+
+          $Ansible.Result = @{ already_enabled = $false }
 
     - name: Start Execution Node API scheduled task
       ansible.windows.win_powershell:
@@ -174,12 +201,7 @@
           Start-ScheduledTask -TaskName $TaskName
           Start-Sleep -Seconds 5
 
-          $Ansible.Result = @{
-              task = $TaskName
-              state = (Get-ScheduledTask -TaskName $TaskName).State.ToString()
-          }
-
-    - name: Wait for Execution Node health with updated MT5 MaxBars
+    - name: Wait for Execution Node health after enabling algo trading
       ansible.windows.win_uri:
         url: http://localhost:8000/health
         method: GET
@@ -187,31 +209,52 @@
           X-API-Key: "{{ execution_node_api_key }}"
         return_content: true
         status_code: 200
-      register: mt5_max_bars_health_response
+      register: algo_trading_health_response
       until:
-        - mt5_max_bars_health_response.status_code is defined
-        - mt5_max_bars_health_response.status_code == 200
-        - mt5_max_bars_health_response.content is defined
-        - (mt5_max_bars_health_response.content | from_json).status == "ok"
-        - (mt5_max_bars_health_response.content | from_json).mt5_connected | bool
-        - ((mt5_max_bars_health_response.content | from_json).mt5_max_bars | int) == (mt5_max_bars | int)
+        - algo_trading_health_response.status_code is defined
+        - algo_trading_health_response.status_code == 200
+        - algo_trading_health_response.content is defined
+        - (algo_trading_health_response.content | from_json).status == "ok"
+        - (algo_trading_health_response.content | from_json).mt5_connected | bool
       retries: 18
       delay: 5
       no_log: true
 
-    - name: Store MT5 MaxBars health response
-      ansible.builtin.set_fact:
-        mt5_max_bars_health: "{{ mt5_max_bars_health_response.content | from_json }}"
-      no_log: true
+    - name: Verify MetaTrader algo trading is enabled
+      ansible.windows.win_powershell:
+        script: |
+          Push-Location "{{ execution_node_repo_path }}"
+          try {
+              $output = & py -3.11 -m poetry run python -c @"
+          import MetaTrader5 as mt5
 
-    - name: Print MT5 MaxBars configuration summary
+          if not mt5.initialize():
+              raise SystemExit('initialize failed')
+
+          terminal = mt5.terminal_info()
+          enabled = bool(terminal and terminal.trade_allowed)
+          print('enabled=' + ('1' if enabled else '0'))
+          mt5.shutdown()
+          "@
+          }
+          finally {
+              Pop-Location
+          }
+
+          if ($output -notmatch 'enabled=1') {
+              throw "MetaTrader algo trading is still disabled: $output"
+          }
+
+          $Ansible.Result = @{
+              algo_trading_enabled = $true
+          }
+
+    - name: Print MT5 algo trading configuration summary
       ansible.builtin.debug:
         msg: |-
-          MT5 MaxBars Configuration
-          -------------------------
+          MT5 Algo Trading Configuration
+          ------------------------------
           Config file: {{ mt5_config_path }}
           Scheduled task: {{ mt5_task_name }}
-          Requested MaxBars: {{ mt5_max_bars | int }}
-          Health MaxBars: {{ mt5_max_bars_health.mt5_max_bars }}
-          MT5 Connected: {{ mt5_max_bars_health.mt5_connected }}
+          Algo trading enabled: true
           Result: OK

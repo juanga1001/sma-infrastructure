@@ -107,7 +107,7 @@ ansible-playbook \
 The playbook:
 
 1. Writes `C:\SMA\mt5\sma-terminal.ini`.
-2. Sets `[Charts] MaxBars`.
+2. Sets `[Charts] MaxBars` and `[Experts] AllowLiveTrading=1` (required for Python order APIs).
 3. Updates `SMA-MT5-Terminal` to launch MT5 with `/config:...`.
 4. Stops the Execution Node API task.
 5. Stops and restarts MetaTrader 5.
@@ -117,6 +117,42 @@ The playbook:
 
 This playbook intentionally restarts MT5 because MetaTrader applies `MaxBars`
 only after a terminal restart.
+
+## Configure MT5 Algo Trading
+
+Use this playbook after provisioning a new VPS or when `/accounts/test-trade`
+returns *“MetaTrader auto-trading is disabled in the terminal.”*
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/configure-mt5-algo-trading.yml
+```
+
+The playbook:
+
+1. Writes `C:\SMA\mt5\sma-terminal.ini` with `[Experts] Enabled=1` and
+   `AllowLiveTrading=1`.
+2. Restarts MetaTrader 5 and the Execution Node API.
+3. Toggles the MT5 Algo Trading toolbar state when a window handle is available.
+4. Verifies `terminal.trade_allowed` through the MetaTrader5 Python package.
+
+## Fix MT5 Algo Trading (recovery)
+
+Use this lighter playbook when algo trading was disabled manually or after a
+terminal reset. It patches MetaTrader `common.ini` under AppData, restarts MT5
+and the API, and verifies algo trading is enabled:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/fix-mt5-algo-trading.yml
+```
+
+Run this before relying on Portfolio Lab **Test Trade** or any future live
+order execution.
 
 ## Deploy Execution Node
 
@@ -173,3 +209,15 @@ Result: OK
 The deployment fails before making changes if the remote working tree contains
 local modifications. This protects manual hotfixes, diagnostics, and any
 uncommitted operator state from being overwritten by automation.
+
+### Typical release workflow
+
+1. Develop and test locally in `sma-execution-node` (`make test`).
+2. Commit and push to GitHub (`git push origin main`).
+3. Run `deploy-execution-node.yml` from this repository on the administrator
+   workstation.
+4. Validate from Portfolio Lab: Test Connection → Test Trade → portfolio deploy
+   test (see Portfolio Lab `docs/platform-and-operations.md`).
+
+If test trade fails with algo trading disabled, run `fix-mt5-algo-trading.yml`
+before redeploying application code.

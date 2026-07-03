@@ -78,6 +78,11 @@ Reboot testing confirmed:
   runtime session.
 - Scheduled Tasks start the Execution Node API automatically after MT5.
 - MT5 preserves the configured broker login.
+
+Algo trading settings are persisted in `C:\SMA\mt5\sma-terminal.ini` and
+MetaTrader `common.ini`. If test trades fail after reboot, run the
+`fix-mt5-algo-trading.yml` Ansible playbook (see
+`ansible/playbooks/README.md` in sma-infrastructure).
 - The Execution Node API reconnects successfully to MT5.
 - `GET /health` returns `mt5_connected=true` after reboot recovery.
 
