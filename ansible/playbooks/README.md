@@ -173,6 +173,11 @@ The watchdog:
 - Restarts `SMA-Execution-Node` when the API is down
 - Restarts `SMA-MT5-Terminal` when `terminal64.exe` is not running
 - Logs actions to `C:\SMA\logs\execution-node-watchdog.log`
+- Runs as the same Windows user as the runtime tasks (typically `Administrator`)
+
+If the watchdog task is missing, inspect `C:\SMA\logs\execution-node-watchdog.log` and re-run
+`configure-execution-node-watchdog.yml`. Older builds used an invalid infinite repetition
+duration that Windows Task Scheduler rejects silently.
 
 `deploy-execution-node.yml` installs or refreshes this watchdog automatically.
 

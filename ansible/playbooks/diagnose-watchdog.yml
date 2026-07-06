@@ -1,0 +1,50 @@
+---
+- name: Diagnose Execution Node watchdog
+  hosts: execution_nodes
+  gather_facts: false
+
+  tasks:
+    - name: Collect watchdog diagnostics
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $Task = Get-ScheduledTask -TaskName 'SMA-Execution-Node-Watchdog' -ErrorAction SilentlyContinue
+          $Info = Get-ScheduledTaskInfo -TaskName 'SMA-Execution-Node-Watchdog' -ErrorAction SilentlyContinue
+          $LogPath = 'C:\SMA\logs\execution-node-watchdog.log'
+          $LogTail = @()
+          if (Test-Path $LogPath) {
+              $LogTail = Get-Content $LogPath -Tail 25
+          }
+
+          $HealthOk = $false
+          try {
+              $Response = Invoke-WebRequest -Uri 'http://localhost:8000/healthcheck' -UseBasicParsing -TimeoutSec 5
+              $HealthOk = ($Response.StatusCode -eq 200)
+          }
+          catch {
+              $HealthOk = $false
+          }
+
+          $EnTask = Get-ScheduledTask -TaskName 'SMA-Execution-Node' -ErrorAction SilentlyContinue
+          $Mt5Task = Get-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
+
+          $Ansible.Result = @{
+              watchdog_exists = ($null -ne $Task)
+              watchdog_state = if ($null -ne $Task) { $Task.State.ToString() } else { 'missing' }
+              watchdog_user = if ($null -ne $Task) { $Task.Principal.UserId } else { $null }
+              watchdog_logon = if ($null -ne $Task) { $Task.Principal.LogonType.ToString() } else { $null }
+              watchdog_last_result = if ($null -ne $Info) { $Info.LastTaskResult } else { $null }
+              watchdog_last_run = if ($null -ne $Info) { $Info.LastRunTime.ToString('o') } else { $null }
+              watchdog_next_run = if ($null -ne $Info) { $Info.NextRunTime.ToString('o') } else { $null }
+              en_user = if ($null -ne $EnTask) { $EnTask.Principal.UserId } else { $null }
+              en_logon = if ($null -ne $EnTask) { $EnTask.Principal.LogonType.ToString() } else { $null }
+              mt5_user = if ($null -ne $Mt5Task) { $Mt5Task.Principal.UserId } else { $null }
+              mt5_running = (@(Get-Process -Name 'terminal64' -ErrorAction SilentlyContinue)).Count
+              health_ok = $HealthOk
+              log_tail = $LogTail
+          }
+      register: watchdog_diag
+
+    - name: Print watchdog diagnostics
+      ansible.builtin.debug:
+        var: watchdog_diag.result
