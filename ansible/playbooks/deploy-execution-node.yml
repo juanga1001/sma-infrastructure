@@ -173,7 +173,11 @@
       no_log: true
 
 
+
 - import_playbook: validate-execution-node.yml
+
+
+- import_playbook: configure-execution-node-watchdog.yml
 
 
 - name: Print SMA Execution Node deployment summary

@@ -154,6 +154,28 @@ ansible-playbook \
 Run this before relying on Portfolio Lab **Test Trade** or any future live
 order execution.
 
+## Configure Execution Node Watchdog
+
+Install the local watchdog that restarts the Execution Node API and MT5 when
+health checks fail while the VPS is running:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/configure-execution-node-watchdog.yml
+```
+
+The watchdog:
+
+- Runs every **2 minutes** as `SMA-Execution-Node-Watchdog`
+- Checks `http://localhost:8000/healthcheck`
+- Restarts `SMA-Execution-Node` when the API is down
+- Restarts `SMA-MT5-Terminal` when `terminal64.exe` is not running
+- Logs actions to `C:\SMA\logs\execution-node-watchdog.log`
+
+`deploy-execution-node.yml` installs or refreshes this watchdog automatically.
+
 ## Deploy Execution Node
 
 Use the deployment playbook to update the Windows VPS from GitHub, restart the

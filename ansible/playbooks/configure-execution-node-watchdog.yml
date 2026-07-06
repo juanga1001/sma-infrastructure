@@ -1,0 +1,78 @@
+---
+- name: Configure SMA Execution Node watchdog
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    watchdog_task_name: SMA-Execution-Node-Watchdog
+    watchdog_script_path: C:\SMA\scripts\execution-node-watchdog.ps1
+    execution_node_task_name: SMA-Execution-Node
+    mt5_task_name: SMA-MT5-Terminal
+
+  tasks:
+    - name: Ensure SMA scripts directory exists
+      ansible.windows.win_file:
+        path: C:\SMA\scripts
+        state: directory
+
+    - name: Install Execution Node watchdog script
+      ansible.windows.win_copy:
+        src: ../scripts/execution-node-watchdog.ps1
+        dest: "{{ watchdog_script_path }}"
+
+    - name: Register Execution Node watchdog scheduled task
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = "{{ watchdog_task_name }}"
+          $ScriptPath = "{{ watchdog_script_path }}"
+          $ExistingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+
+          $Action = New-ScheduledTaskAction `
+              -Execute "powershell.exe" `
+              -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+
+          $Trigger = New-ScheduledTaskTrigger `
+              -Once `
+              -At (Get-Date) `
+              -RepetitionInterval (New-TimeSpan -Minutes 2) `
+              -RepetitionDuration ([TimeSpan]::MaxValue)
+
+          $Settings = New-ScheduledTaskSettingsSet `
+              -AllowStartIfOnBatteries `
+              -DontStopIfGoingOnBatteries `
+              -StartWhenAvailable `
+              -MultipleInstances IgnoreNew
+
+          if ($null -eq $ExistingTask) {
+              Register-ScheduledTask `
+                  -TaskName $TaskName `
+                  -Action $Action `
+                  -Trigger $Trigger `
+                  -Settings $Settings `
+                  -Description "Restarts SMA Execution Node API and MT5 when local health checks fail." `
+                  | Out-Null
+          }
+          else {
+              Set-ScheduledTask -TaskName $TaskName -Action $Action | Out-Null
+              Set-ScheduledTask -TaskName $TaskName -Trigger $Trigger | Out-Null
+              Set-ScheduledTask -TaskName $TaskName -Settings $Settings | Out-Null
+          }
+
+          Start-ScheduledTask -TaskName $TaskName
+
+          $Ansible.Result = @{
+              task = $TaskName
+              script = $ScriptPath
+              state = (Get-ScheduledTask -TaskName $TaskName).State.ToString()
+          }
+
+    - name: Print watchdog summary
+      ansible.builtin.debug:
+        msg: |-
+          Execution Node Watchdog Configured
+          Task: {{ watchdog_task_name }}
+          Script: {{ watchdog_script_path }}
+          Interval: every 2 minutes
+          Checks:
+            - http://localhost:8000/healthcheck
+            - terminal64.exe process
