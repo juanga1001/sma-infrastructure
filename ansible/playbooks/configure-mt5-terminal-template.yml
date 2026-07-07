@@ -1,0 +1,69 @@
+---
+- name: Configure MT5 terminal template for per-account provisioning
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    mt5_source_terminal_path: C:\Program Files\MetaTrader 5\terminal64.exe
+    mt5_terminal_template_dir: C:\SMA\MT5\_template
+
+  tasks:
+    - name: Verify source MetaTrader 5 terminal executable exists
+      ansible.windows.win_stat:
+        path: "{{ mt5_source_terminal_path }}"
+      register: mt5_source_terminal
+
+    - name: Fail when source MetaTrader 5 terminal executable is missing
+      ansible.builtin.assert:
+        that:
+          - mt5_source_terminal.stat.exists
+        fail_msg: >-
+          MetaTrader 5 terminal was not found at {{ mt5_source_terminal_path }}.
+        quiet: true
+
+    - name: Ensure SMA MT5 root directory exists
+      ansible.windows.win_file:
+        path: C:\SMA\MT5
+        state: directory
+
+    - name: Ensure MT5 terminal template directory exists
+      ansible.windows.win_file:
+        path: "{{ mt5_terminal_template_dir }}"
+        state: directory
+
+    - name: Copy MetaTrader 5 into SMA terminal template directory
+      ansible.windows.win_powershell:
+        script: |
+          $SourceRoot = Split-Path -Parent "{{ mt5_source_terminal_path }}"
+          $TargetRoot = "{{ mt5_terminal_template_dir }}"
+          $TargetExecutable = Join-Path $TargetRoot 'terminal64.exe'
+
+          if (Test-Path $TargetExecutable) {
+              $Ansible.Result = @{
+                  template_dir = $TargetRoot
+                  status = 'already_present'
+              }
+              return
+          }
+
+          $CopyResult = robocopy $SourceRoot $TargetRoot /E /NFL /NDL /NJH /NJS /NC /NS
+          if ($LASTEXITCODE -ge 8) {
+              throw "Failed to copy MT5 template from $SourceRoot to $TargetRoot (exit code $LASTEXITCODE)."
+          }
+
+          if (-not (Test-Path $TargetExecutable)) {
+              throw "MT5 template copy completed but terminal64.exe is missing at $TargetExecutable."
+          }
+
+          $Ansible.Result = @{
+              template_dir = $TargetRoot
+              status = 'copied'
+          }
+      register: mt5_template_copy
+
+    - name: Print MT5 terminal template summary
+      ansible.builtin.debug:
+        msg: |-
+          MT5 Terminal Template Configured
+          Template: {{ mt5_terminal_template_dir }}
+          Status: {{ mt5_template_copy.result.status }}
