@@ -16,19 +16,26 @@ sma-infrastructure/
 ├── requirements.txt
 ├── vault/
 │   ├── README.md
-│   └── execution-node.example.yml
+│   ├── execution-node.example.yml
+│   └── sma-app.example.yml
 ├── docs/
 │   ├── ansible-workstation.md
-│   └── execution-node/
+│   ├── execution-node/
+│   │   ├── architecture.md
+│   │   ├── windows-vps.md
+│   │   └── findings.md
+│   └── sma-app/
 │       ├── architecture.md
-│       ├── windows-vps.md
-│       └── findings.md
+│       └── linux-server.md
 ├── ansible/
 │   ├── inventories/
 │   │   └── production/
 │   │       └── hosts.yml
 │   ├── playbooks/
-│   │   └── validate-execution-node.yml
+│   │   ├── deploy-execution-node.yml
+│   │   ├── deploy-sma-app.yml
+│   │   ├── validate-execution-node.yml
+│   │   └── validate-sma-app.yml
 │   └── roles/
 └── scripts/
 ```
@@ -170,6 +177,53 @@ ansible-playbook \
 
 The deployment playbook also runs this network configuration step before
 restarting the Execution Node API.
+
+## SMA App Deployment
+
+SMA App runs on a Linux Docker Compose server and is managed over SSH from the
+administrator workstation.
+
+First-time server setup:
+
+- [SMA App architecture](docs/sma-app/architecture.md)
+- [Linux server operations](docs/sma-app/linux-server.md)
+
+Create the local credential file:
+
+```bash
+cp vault/sma-app.example.yml vault/sma-app.yml
+```
+
+Set the real server IP in `ansible/inventories/production/hosts.yml`, then test
+SSH connectivity:
+
+```bash
+ansible sma_app_servers \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/sma-app.yml \
+  -m ping
+```
+
+Validate SMA App health:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/sma-app.yml \
+  ansible/playbooks/validate-sma-app.yml
+```
+
+Deploy SMA App from GitHub:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/sma-app.yml \
+  ansible/playbooks/deploy-sma-app.yml
+```
+
+See [Execution Node playbooks](ansible/playbooks/README.md) for the full SMA App
+and Execution Node playbook reference.
 
 ## Roadmap
 

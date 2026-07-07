@@ -4,3 +4,4 @@ vault/*
 !vault/.gitkeep
 !vault/README.md
 !vault/execution-node.example.yml
+!vault/sma-app.example.yml

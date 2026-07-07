@@ -1,0 +1,113 @@
+---
+- name: Validate SMA App production health
+  hosts: sma_app_servers
+  gather_facts: false
+
+  vars:
+    sma_app_repo_path: /opt/sma/sma_app
+    sma_app_public_url: https://systematicmindacademy.com
+    sma_app_health_check_path: /
+    sma_app_product_check_path: /products/build-trading-bots
+    sma_app_compose_file: docker-compose.prod.yml
+    sma_app_env_file: .env.production
+    sma_app_required_services:
+      - app
+      - web
+      - caddy
+      - db
+      - queue
+      - scheduler
+
+  tasks:
+    - name: Verify SSH connectivity
+      ansible.builtin.ping:
+
+    - name: Verify Docker is available
+      ansible.builtin.command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Verify Docker Compose is available
+      ansible.builtin.command: docker compose version
+      register: docker_compose_version
+      changed_when: false
+
+    - name: Verify production environment file exists
+      ansible.builtin.stat:
+        path: "{{ sma_app_repo_path }}/{{ sma_app_env_file }}"
+      register: sma_app_env
+
+    - name: Fail when production environment file is missing
+      ansible.builtin.assert:
+        that:
+          - sma_app_env.stat.exists
+          - sma_app_env.stat.isreg
+        fail_msg: >-
+          Production environment file was not found at
+          {{ sma_app_repo_path }}/{{ sma_app_env_file }}.
+        quiet: true
+
+    - name: Query production container status
+      ansible.builtin.command: >-
+        docker compose
+        -f {{ sma_app_compose_file }}
+        --env-file {{ sma_app_env_file }}
+        ps --format json
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      register: compose_ps
+      changed_when: false
+
+    - name: Parse production container status
+      ansible.builtin.set_fact:
+        sma_app_containers: "{{ compose_ps.stdout_lines | map('from_json') | list }}"
+
+    - name: Verify required production services are running
+      ansible.builtin.assert:
+        that:
+          - item in (sma_app_containers | map(attribute='Service') | list)
+          - >-
+            (sma_app_containers
+            | selectattr('Service', 'equalto', item)
+            | map(attribute='State')
+            | first) is match('running')
+        fail_msg: "Required service '{{ item }}' is missing or not running."
+        quiet: true
+      loop: "{{ sma_app_required_services }}"
+
+    - name: Query public site health endpoint
+      ansible.builtin.uri:
+        url: "{{ sma_app_public_url }}{{ sma_app_health_check_path }}"
+        method: GET
+        status_code: 200
+        follow_redirects: all
+        validate_certs: true
+      register: public_health
+      changed_when: false
+
+    - name: Query product page health endpoint
+      ansible.builtin.uri:
+        url: "{{ sma_app_public_url }}{{ sma_app_product_check_path }}"
+        method: GET
+        status_code: 200
+        follow_redirects: all
+        validate_certs: true
+      register: product_health
+      changed_when: false
+
+    - name: Store validation health status
+      ansible.builtin.set_fact:
+        sma_app_health_status: "{{ public_health.status }}"
+
+    - name: Print SMA App validation summary
+      ansible.builtin.debug:
+        msg: |-
+          SMA App Validation
+          ------------------
+          SSH: OK
+          Docker: {{ docker_version.stdout | trim }}
+          Compose: {{ docker_compose_version.stdout | trim }}
+          Required Services: OK
+          Public Site: {{ public_health.status }}
+          Product Page: {{ product_health.status }}
+          URL: {{ sma_app_public_url }}

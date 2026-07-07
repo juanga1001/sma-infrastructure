@@ -14,6 +14,16 @@ WinRM HTTPS
 Windows Execution Node VPS
 ```
 
+Linux app servers such as SMA App use SSH instead of WinRM:
+
+```text
+MacBook workstation
+↓ Ansible
+SSH
+↓
+Linux SMA App server
+```
+
 ## Why Ansible Runs from the Workstation
 
 The workstation is the control plane for infrastructure automation. This keeps

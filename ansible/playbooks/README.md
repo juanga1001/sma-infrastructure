@@ -288,3 +288,98 @@ uncommitted operator state from being overwritten by automation.
 
 If test trade fails with algo trading disabled, run `fix-mt5-algo-trading.yml`
 before redeploying application code.
+
+## Validate SMA App
+
+Use the read-only validation playbook to confirm that the Linux SMA App server
+is operational without opening an SSH shell:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/sma-app.yml \
+  ansible/playbooks/validate-sma-app.yml
+```
+
+The playbook verifies:
+
+- SSH connectivity
+- Docker and Docker Compose availability
+- `.env.production` presence
+- Required production containers (`app`, `web`, `caddy`, `db`, `queue`, `scheduler`)
+- Public HTTPS health for the site and a product page
+
+The ignored local `vault/sma-app.yml` file must include SSH credentials, for
+example:
+
+```yaml
+ansible_user: deploy
+ansible_ssh_private_key_file: ~/.ssh/sma_app_deploy
+```
+
+Before running validation or deployment, replace `CHANGE_ME` in
+`ansible/inventories/production/hosts.yml` with the real SMA App server IP or
+hostname.
+
+For first-time server setup, see
+[Linux server operations](../docs/sma-app/linux-server.md).
+
+## Deploy SMA App
+
+Use the deployment playbook to update the Linux app server from GitHub and run
+the production Docker Compose release:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/sma-app.yml \
+  ansible/playbooks/deploy-sma-app.yml
+```
+
+By default, the playbook deploys `main`. To deploy a specific branch:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/sma-app.yml \
+  -e sma_app_git_branch=feature/my-branch \
+  ansible/playbooks/deploy-sma-app.yml
+```
+
+The playbook performs the deployment in this order:
+
+1. Verify `/opt/sma/sma_app` exists.
+2. Verify `.env.production` exists.
+3. Verify the Git working tree is clean.
+4. Verify the Git remote can authenticate non-interactively.
+5. Fetch remote Git state.
+6. Checkout the selected branch from `origin`.
+7. Pull the latest selected branch.
+8. Run `make prod-deploy`.
+9. Wait for `https://systematicmindacademy.com` to return HTTP `200`.
+10. Reuse `validate-sma-app.yml`.
+11. Print the deployment summary.
+
+Expected summary:
+
+```text
+Deployment Successful
+Branch: main
+Commit: abc1234...
+Message: fix: restore Hotmart checkout links
+URL: https://systematicmindacademy.com
+HTTP Status: 200
+Result: OK
+```
+
+The deployment fails before making changes if the remote working tree contains
+local modifications.
+
+### Typical release workflow
+
+1. Develop and test locally in `sma_app`.
+2. Commit and push to GitHub.
+3. Run `deploy-sma-app.yml` from this repository on the administrator
+   workstation.
+4. Validate the public site and checkout buttons.
+

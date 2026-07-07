@@ -1,0 +1,168 @@
+---
+- name: Deploy SMA App production stack
+  hosts: sma_app_servers
+  gather_facts: false
+
+  vars:
+    sma_app_git_branch: main
+    sma_app_repo_path: /opt/sma/sma_app
+    sma_app_public_url: https://systematicmindacademy.com
+    sma_app_health_check_path: /
+    sma_app_compose_file: docker-compose.prod.yml
+    sma_app_env_file: .env.production
+    sma_app_required_services:
+      - app
+      - web
+      - caddy
+      - db
+      - queue
+      - scheduler
+
+  tasks:
+    - name: Verify SMA App repository exists
+      ansible.builtin.stat:
+        path: "{{ sma_app_repo_path }}"
+      register: sma_app_repo
+
+    - name: Fail when SMA App repository is missing
+      ansible.builtin.assert:
+        that:
+          - sma_app_repo.stat.exists
+          - sma_app_repo.stat.isdir
+        fail_msg: >-
+          SMA App repository was not found at {{ sma_app_repo_path }}.
+          Clone the repository on the server before running deployment automation.
+        quiet: true
+
+    - name: Verify production environment file exists
+      ansible.builtin.stat:
+        path: "{{ sma_app_repo_path }}/{{ sma_app_env_file }}"
+      register: sma_app_env
+
+    - name: Fail when production environment file is missing
+      ansible.builtin.assert:
+        that:
+          - sma_app_env.stat.exists
+          - sma_app_env.stat.isreg
+        fail_msg: >-
+          Production environment file was not found at
+          {{ sma_app_repo_path }}/{{ sma_app_env_file }}.
+          Create it on the server before deploying.
+        quiet: true
+
+    - name: Verify git working tree is clean
+      ansible.builtin.command: git status --porcelain
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      register: git_status
+      changed_when: false
+
+    - name: Fail when git working tree has local modifications
+      ansible.builtin.assert:
+        that:
+          - git_status.stdout | trim | length == 0
+        fail_msg: |-
+          SMA App working tree is not clean.
+          Refusing to deploy over local modifications:
+          {{ git_status.stdout }}
+        quiet: true
+
+    - name: Verify Git remote can authenticate non-interactively
+      ansible.builtin.command: git ls-remote --exit-code origin
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+      changed_when: false
+
+    - name: Fetch latest remote state
+      ansible.builtin.command: git fetch --all
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+
+    - name: Verify target branch exists on origin
+      ansible.builtin.command: >-
+        git show-ref --verify --quiet
+        refs/remotes/origin/{{ sma_app_git_branch }}
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      changed_when: false
+
+    - name: Checkout target branch
+      ansible.builtin.command: >-
+        git checkout -B {{ sma_app_git_branch }}
+        origin/{{ sma_app_git_branch }}
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+
+    - name: Pull latest target branch changes
+      ansible.builtin.command: git pull origin {{ sma_app_git_branch }}
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+
+    - name: Capture deployment commit SHA
+      ansible.builtin.command: git rev-parse HEAD
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      register: deployment_commit_sha
+      changed_when: false
+
+    - name: Capture deployment commit message
+      ansible.builtin.command: git log --oneline -1
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      register: deployment_commit_message
+      changed_when: false
+
+    - name: Store deployment summary facts
+      ansible.builtin.set_fact:
+        deployed_sma_app_branch: "{{ sma_app_git_branch }}"
+        deployed_sma_app_commit_sha: "{{ deployment_commit_sha.stdout | trim }}"
+        deployed_sma_app_commit_message: "{{ deployment_commit_message.stdout | trim }}"
+
+    - name: Run production deployment
+      ansible.builtin.command: make prod-deploy
+      args:
+        chdir: "{{ sma_app_repo_path }}"
+      register: prod_deploy
+      changed_when: true
+
+    - name: Wait for public site readiness
+      ansible.builtin.uri:
+        url: "{{ sma_app_public_url }}{{ sma_app_health_check_path }}"
+        method: GET
+        status_code: 200
+        follow_redirects: all
+        validate_certs: true
+      register: deployment_health_response
+      until:
+        - deployment_health_response.status is defined
+        - deployment_health_response.status == 200
+      retries: 12
+      delay: 10
+
+    - name: Store deployment health response
+      ansible.builtin.set_fact:
+        deployment_health_status: "{{ deployment_health_response.status }}"
+
+- import_playbook: validate-sma-app.yml
+
+- name: Print SMA App deployment summary
+  hosts: sma_app_servers
+  gather_facts: false
+
+  tasks:
+    - name: Print deployment summary
+      ansible.builtin.debug:
+        msg: |-
+          Deployment Successful
+          Branch: {{ deployed_sma_app_branch }}
+          Commit: {{ deployed_sma_app_commit_sha }}
+          Message: {{ deployed_sma_app_commit_message }}
+          URL: {{ sma_app_public_url }}
+          HTTP Status: {{ deployment_health_status | default(sma_app_health_status | default('unknown')) }}
+          Result: OK

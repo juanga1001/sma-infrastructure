@@ -1,0 +1,11 @@
+---
+# Template only. Copy this file to vault/sma-app.yml and edit the copy.
+# The real vault/sma-app.yml file contains local credentials and must
+# never be committed.
+#
+# SSH authentication options:
+# - Preferred: SSH private key
+# - Alternative: password auth (less preferred)
+ansible_user: root
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519_github
+# ansible_password: CHANGE_ME
