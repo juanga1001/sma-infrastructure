@@ -19,20 +19,35 @@ function Write-WatchdogLog {
     "$Timestamp $Message" | Add-Content -Path $LogPath
 }
 
-function Get-ExecutionNodeApiKey {
-    param([string]$Path)
+function Get-ExecutionNodeEnvValue {
+    param(
+        [string]$Name,
+        [string]$Path
+    )
 
     if (-not (Test-Path $Path)) {
         return $null
     }
 
     foreach ($Line in Get-Content $Path) {
-        if ($Line -match '^\s*EXECUTION_NODE_API_KEY\s*=\s*(.+)\s*$') {
+        if ($Line -match "^\s*$Name\s*=\s*(.+)\s*$") {
             return $Matches[1].Trim().Trim('"').Trim("'")
         }
     }
 
     return $null
+}
+
+function Get-ExecutionNodeApiKey {
+    param([string]$Path)
+
+    return Get-ExecutionNodeEnvValue -Name 'EXECUTION_NODE_API_KEY' -Path $Path
+}
+
+function Get-DefaultTerminalPath {
+    param([string]$Path)
+
+    return Get-ExecutionNodeEnvValue -Name 'MT5_PATH' -Path $Path
 }
 
 function Test-ExecutionNodeHealth {
@@ -81,8 +96,53 @@ function Start-Mt5Terminal {
         return $false
     }
 
-    Start-Process -FilePath $ExecutablePath | Out-Null
+    $ConfigPath = 'C:\SMA\mt5\sma-terminal.ini'
+    $LaunchCommand = "`"$ExecutablePath`""
+    if ($NormalizedPath -like '*\sma\mt5\*') {
+        if (Test-Path $ConfigPath) {
+            $LaunchCommand = "`"$ExecutablePath`" /portable /config:`"$ConfigPath`""
+        }
+        else {
+            $LaunchCommand = "`"$ExecutablePath`" /portable"
+        }
+    }
+    elseif (Test-Path $ConfigPath) {
+        $LaunchCommand = "`"$ExecutablePath`" /config:`"$ConfigPath`""
+    }
+
+    Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', $LaunchCommand) | Out-Null
     return $true
+}
+
+function Ensure-TerminalPathsRunning {
+    param(
+        [string[]]$TerminalPaths,
+        [string]$Reason
+    )
+
+    $UniquePaths = @($TerminalPaths | Where-Object { $_ -and $_.Trim().Length -gt 0 } | Select-Object -Unique)
+    if ($UniquePaths.Count -eq 0) {
+        Write-WatchdogLog "No $Reason terminals required."
+        return
+    }
+
+    foreach ($Path in $UniquePaths) {
+        if (Test-TerminalRunning -ExecutablePath $Path) {
+            Write-WatchdogLog "Terminal already running ($Reason): $Path"
+            continue
+        }
+
+        Write-WatchdogLog "Starting terminal ($Reason): $Path"
+        if (Start-Mt5Terminal -ExecutablePath $Path) {
+            Start-Sleep -Seconds $Mt5StartupWaitSeconds
+            if (Test-TerminalRunning -ExecutablePath $Path) {
+                Write-WatchdogLog "Terminal started successfully ($Reason): $Path"
+            }
+            else {
+                Write-WatchdogLog "Terminal failed to start ($Reason): $Path"
+            }
+        }
+    }
 }
 
 function Restart-ScheduledTaskSafely {
@@ -131,34 +191,21 @@ try {
     }
 
     $ApiKey = Get-ExecutionNodeApiKey -Path $EnvFilePath
+    $DefaultTerminalPath = Get-DefaultTerminalPath -Path $EnvFilePath
+    if ($DefaultTerminalPath) {
+        Ensure-TerminalPathsRunning -TerminalPaths @($DefaultTerminalPath) -Reason 'default API'
+    }
+    else {
+        Write-WatchdogLog 'MT5_PATH not configured in Execution Node .env; skipping default terminal check.'
+    }
+
     if ($null -eq $ApiKey -or $ApiKey.Length -eq 0) {
         Write-WatchdogLog "Execution Node API key not found in $EnvFilePath; skipping deployment terminal checks."
     }
     else {
         try {
             $RequiredPaths = Get-RequiredTerminalPaths -ApiKey $ApiKey
-            if ($RequiredPaths.Count -eq 0) {
-                Write-WatchdogLog 'No active deployment terminals required.'
-            }
-            else {
-                foreach ($Path in $RequiredPaths) {
-                    if (Test-TerminalRunning -ExecutablePath $Path) {
-                        Write-WatchdogLog "Terminal already running: $Path"
-                        continue
-                    }
-
-                    Write-WatchdogLog "Starting terminal for active deployment: $Path"
-                    if (Start-Mt5Terminal -ExecutablePath $Path) {
-                        Start-Sleep -Seconds $Mt5StartupWaitSeconds
-                        if (Test-TerminalRunning -ExecutablePath $Path) {
-                            Write-WatchdogLog "Terminal started successfully: $Path"
-                        }
-                        else {
-                            Write-WatchdogLog "Terminal failed to start: $Path"
-                        }
-                    }
-                }
-            }
+            Ensure-TerminalPathsRunning -TerminalPaths $RequiredPaths -Reason 'active deployment'
         }
         catch {
             Write-WatchdogLog "Failed to ensure active deployment terminals: $($_.Exception.Message)"
