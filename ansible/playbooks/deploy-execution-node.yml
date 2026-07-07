@@ -92,6 +92,18 @@
       environment:
         GIT_TERMINAL_PROMPT: "0"
 
+- import_playbook: configure-execution-node-env.yml
+
+- name: Deploy SMA Execution Node Windows Native Runtime (continued)
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    execution_node_git_branch: main
+    execution_node_repo_path: C:\SMA\sma-execution-node
+    execution_node_task_name: SMA-Execution-Node
+
+  tasks:
     - name: Capture deployment commit SHA
       ansible.windows.win_command: git rev-parse HEAD
       args:

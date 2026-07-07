@@ -181,6 +181,44 @@ duration that Windows Task Scheduler rejects silently.
 
 `deploy-execution-node.yml` installs or refreshes this watchdog automatically.
 
+## Configure Execution Node Environment
+
+Use this playbook to idempotently insert or update non-secret values in
+`C:\SMA\sma-execution-node\.env` without opening an RDP session:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  ansible/playbooks/configure-execution-node-env.yml
+```
+
+By default it ensures:
+
+```text
+MT5_PATH=C:\Program Files\MetaTrader 5\terminal64.exe
+MT5_TERMINAL_TEMPLATE_DIR=C:\SMA\MT5\_template
+MT5_TERMINAL_CONFIG_PATH=C:\SMA\mt5\sma-terminal.ini
+ACCOUNT_CONNECTION_TEST_TIMEOUT_SECONDS=300
+```
+
+Override a path when needed:
+
+```bash
+ansible-playbook \
+  -i ansible/inventories/production/hosts.yml \
+  -e @vault/execution-node.yml \
+  -e execution_node_mt5_path='D:\MetaTrader 5\terminal64.exe' \
+  ansible/playbooks/configure-execution-node-env.yml
+```
+
+The helper script upserts each key: existing lines are updated, missing keys are
+appended. Broker credentials and API keys should remain in the VPS `.env` or
+local vault files; only infrastructure defaults belong in this playbook.
+
+`deploy-execution-node.yml` runs this playbook automatically after `git pull`
+and before restarting the API.
+
 ## Deploy Execution Node
 
 Use the deployment playbook to update the Windows VPS from GitHub, restart the
@@ -212,11 +250,13 @@ The playbook performs the deployment in this order:
 5. Fetch remote Git state.
 6. Checkout the selected branch from `origin`.
 7. Pull the latest selected branch.
-8. Capture commit metadata.
-9. Restart only the `SMA-Execution-Node` Scheduled Task.
-10. Wait for `http://localhost:8000/health` to return `status=ok`.
-11. Reuse `validate-execution-node.yml`.
-12. Print the deployment summary.
+8. Ensure managed `.env` values such as `MT5_PATH`.
+9. Capture commit metadata.
+10. Restart only the `SMA-Execution-Node` Scheduled Task.
+11. Wait for `http://localhost:8000/health` to return `status=ok`.
+12. Reuse `validate-execution-node.yml`.
+13. Install or refresh the watchdog.
+14. Print the deployment summary.
 
 The playbook intentionally does not stop or restart `SMA-MT5-Terminal`. MT5 must
 remain running so the Python API can reconnect through the existing terminal

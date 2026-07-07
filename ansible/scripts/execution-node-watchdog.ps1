@@ -198,6 +198,11 @@ try {
 
     if ($ConnectionTestsActive -gt 0) {
         Write-WatchdogLog "Connection test in progress ($ConnectionTestsActive active); skipping API restart and default terminal checks."
+        $Mt5Task = Get-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
+        if ($null -ne $Mt5Task -and $Mt5Task.State -eq 'Running') {
+            Stop-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
+            Write-WatchdogLog 'Stopped SMA-MT5-Terminal while connection test is active.'
+        }
     }
     elseif (-not (Test-ExecutionNodeHealth)) {
         Write-WatchdogLog 'Execution Node healthcheck failed; restarting API scheduled task.'

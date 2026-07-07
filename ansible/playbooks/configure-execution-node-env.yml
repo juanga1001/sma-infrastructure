@@ -1,0 +1,86 @@
+---
+- name: Configure SMA Execution Node environment file
+  hosts: execution_nodes
+  gather_facts: false
+
+  vars:
+    execution_node_repo_path: C:\SMA\sma-execution-node
+    execution_node_env_path: C:\SMA\sma-execution-node\.env
+    execution_node_scripts_path: C:\SMA\scripts
+    execution_node_env_script_path: C:\SMA\scripts\set-execution-node-env-value.ps1
+    execution_node_mt5_path: 'C:\Program Files\MetaTrader 5\terminal64.exe'
+    execution_node_mt5_terminal_template_dir: C:\SMA\MT5\_template
+    execution_node_mt5_terminal_config_path: C:\SMA\mt5\sma-terminal.ini
+    execution_node_account_connection_test_timeout_seconds: '300'
+    execution_node_env_managed:
+      MT5_PATH: '{{ execution_node_mt5_path }}'
+      MT5_TERMINAL_TEMPLATE_DIR: '{{ execution_node_mt5_terminal_template_dir }}'
+      MT5_TERMINAL_CONFIG_PATH: '{{ execution_node_mt5_terminal_config_path }}'
+      ACCOUNT_CONNECTION_TEST_TIMEOUT_SECONDS: >-
+        {{ execution_node_account_connection_test_timeout_seconds }}
+
+  tasks:
+    - name: Verify Execution Node repository exists
+      ansible.windows.win_stat:
+        path: "{{ execution_node_repo_path }}"
+      register: execution_node_repo
+
+    - name: Fail when Execution Node repository is missing
+      ansible.builtin.assert:
+        that:
+          - execution_node_repo.stat.exists
+          - execution_node_repo.stat.isdir
+        fail_msg: >-
+          Execution Node repository was not found at {{ execution_node_repo_path }}.
+          Provision the repository before configuring its .env file.
+        quiet: true
+
+    - name: Ensure SMA scripts directory exists
+      ansible.windows.win_file:
+        path: "{{ execution_node_scripts_path }}"
+        state: directory
+
+    - name: Install Execution Node .env helper script
+      ansible.windows.win_copy:
+        src: ../scripts/set-execution-node-env-value.ps1
+        dest: "{{ execution_node_env_script_path }}"
+
+    - name: Ensure Execution Node .env file exists
+      ansible.windows.win_copy:
+        dest: "{{ execution_node_env_path }}"
+        content: |
+          # Managed in part by sma-infrastructure Ansible playbooks.
+        force: false
+
+    - name: Ensure managed values in Execution Node .env
+      ansible.windows.win_powershell:
+        script: |
+          param(
+              [string]$ScriptPath,
+              [string]$EnvFilePath,
+              [string]$Name,
+              [string]$Value
+          )
+
+          $Result = & $ScriptPath `
+              -EnvFilePath $EnvFilePath `
+              -Name $Name `
+              -Value $Value
+
+          $Ansible.Result = $Result
+        parameters:
+          ScriptPath: "{{ execution_node_env_script_path }}"
+          EnvFilePath: "{{ execution_node_env_path }}"
+          Name: "{{ item.key }}"
+          Value: "{{ item.value }}"
+      loop: "{{ execution_node_env_managed | dict2items }}"
+      register: execution_node_env_updates
+
+    - name: Print managed Execution Node .env summary
+      ansible.builtin.debug:
+        msg: |-
+          Execution Node .env updated at {{ execution_node_env_path }}
+          Managed keys:
+          {% for item in execution_node_env_managed | dict2items %}
+          - {{ item.key }}={{ item.value }}
+          {% endfor %}
