@@ -3,7 +3,7 @@ param(
     [string]$LogFileName = 'execution-node-watchdog.log',
     [string]$ExecutionNodeTaskName = 'SMA-Execution-Node',
     [string]$EnvFilePath = 'C:\SMA\sma-execution-node\.env',
-    [int]$HealthTimeoutSeconds = 5,
+    [int]$HealthTimeoutSeconds = 30,
     [int]$Mt5StartupWaitSeconds = 20
 )
 
@@ -63,15 +63,21 @@ function Test-ExecutionNodeHealth {
     }
 }
 
-function Get-RequiredTerminalPaths {
+function Get-WatchdogState {
     param([string]$ApiKey)
 
     $Headers = @{ 'X-API-Key' = $ApiKey }
-    $Response = Invoke-RestMethod `
+    return Invoke-RestMethod `
         -Uri 'http://localhost:8000/ops/watchdog/terminals' `
         -Headers $Headers `
         -TimeoutSec $HealthTimeoutSeconds
-    return @($Response.terminal_paths)
+}
+
+function Get-RequiredTerminalPaths {
+    param([string]$ApiKey)
+
+    $State = Get-WatchdogState -ApiKey $ApiKey
+    return @($State.terminal_paths)
 }
 
 function Test-TerminalRunning {
@@ -96,6 +102,7 @@ function Start-Mt5Terminal {
         return $false
     }
 
+    $NormalizedPath = $ExecutablePath.ToLowerInvariant()
     $ConfigPath = 'C:\SMA\mt5\sma-terminal.ini'
     $LaunchCommand = "`"$ExecutablePath`""
     if ($NormalizedPath -like '*\sma\mt5\*') {
@@ -177,7 +184,22 @@ function Restart-ScheduledTaskSafely {
 try {
     Write-WatchdogLog 'Watchdog check started.'
 
-    if (-not (Test-ExecutionNodeHealth)) {
+    $ApiKey = Get-ExecutionNodeApiKey -Path $EnvFilePath
+    $ConnectionTestsActive = 0
+    if ($null -ne $ApiKey -and $ApiKey.Length -gt 0) {
+        try {
+            $WatchdogState = Get-WatchdogState -ApiKey $ApiKey
+            $ConnectionTestsActive = [int]$WatchdogState.connection_tests_active
+        }
+        catch {
+            Write-WatchdogLog "Failed to read watchdog state: $($_.Exception.Message)"
+        }
+    }
+
+    if ($ConnectionTestsActive -gt 0) {
+        Write-WatchdogLog "Connection test in progress ($ConnectionTestsActive active); skipping API restart and default terminal checks."
+    }
+    elseif (-not (Test-ExecutionNodeHealth)) {
         Write-WatchdogLog 'Execution Node healthcheck failed; restarting API scheduled task.'
         Restart-ScheduledTaskSafely -TaskName $ExecutionNodeTaskName
         Start-Sleep -Seconds 10
@@ -190,9 +212,11 @@ try {
         }
     }
 
-    $ApiKey = Get-ExecutionNodeApiKey -Path $EnvFilePath
     $DefaultTerminalPath = Get-DefaultTerminalPath -Path $EnvFilePath
-    if ($DefaultTerminalPath) {
+    if ($ConnectionTestsActive -gt 0) {
+        Write-WatchdogLog 'Skipping default API terminal check while connection test is active.'
+    }
+    elseif ($DefaultTerminalPath) {
         Ensure-TerminalPathsRunning -TerminalPaths @($DefaultTerminalPath) -Reason 'default API'
     }
     else {
