@@ -76,6 +76,26 @@
       loop: "{{ execution_node_env_managed | dict2items }}"
       register: execution_node_env_updates
 
+    - name: Strip UTF-8 BOM from Execution Node .env when present
+      ansible.windows.win_powershell:
+        script: |
+          param([string]$EnvFilePath)
+
+          if (-not (Test-Path $EnvFilePath)) {
+              $Ansible.Result = @{ bom_removed = $false }
+              return
+          }
+
+          $Content = [System.IO.File]::ReadAllText($EnvFilePath)
+          $Updated = $Content.TrimStart([char]0xFEFF)
+          $Encoding = New-Object System.Text.UTF8Encoding $False
+          [System.IO.File]::WriteAllText($EnvFilePath, $Updated, $Encoding)
+          $Ansible.Result = @{
+              bom_removed = ($Content.Length -ne $Updated.Length)
+          }
+        parameters:
+          EnvFilePath: "{{ execution_node_env_path }}"
+
     - name: Print managed Execution Node .env summary
       ansible.builtin.debug:
         msg: |-
@@ -84,3 +104,60 @@
           {% for item in execution_node_env_managed | dict2items %}
           - {{ item.key }}={{ item.value }}
           {% endfor %}
+
+    - name: Restart default MT5 scheduled task after .env update
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = 'SMA-MT5-Terminal'
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+          if ($Task.State -eq 'Running') {
+              Stop-ScheduledTask -TaskName $TaskName
+              Start-Sleep -Seconds 3
+          }
+          Start-ScheduledTask -TaskName $TaskName
+          Start-Sleep -Seconds 20
+          $Running = @(
+              Get-CimInstance Win32_Process -Filter "Name = 'terminal64.exe'" -ErrorAction SilentlyContinue
+          ).Count
+          $Ansible.Result = @{ terminal_process_count = $Running }
+
+    - name: Restart Execution Node scheduled task after .env update
+      ansible.windows.win_powershell:
+        script: |
+          $TaskName = 'SMA-Execution-Node'
+          $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+          if ($null -eq $Task) {
+              throw "Scheduled task not found: $TaskName"
+          }
+          if ($Task.State -eq 'Running') {
+              Stop-ScheduledTask -TaskName $TaskName
+              Start-Sleep -Seconds 3
+          }
+          $ApiProcesses = @(
+              Get-CimInstance Win32_Process |
+              Where-Object {
+                  $_.CommandLine -like '*uvicorn*' -and
+                  $_.CommandLine -like '*src.main:app*'
+              }
+          )
+          foreach ($Process in $ApiProcesses) {
+              Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
+          }
+          Start-ScheduledTask -TaskName $TaskName
+          Start-Sleep -Seconds 10
+
+    - name: Wait for Execution Node healthcheck after .env update
+      ansible.windows.win_uri:
+        url: http://localhost:8000/healthcheck
+        method: GET
+        return_content: true
+        status_code: 200
+      register: env_update_healthcheck
+      until:
+        - env_update_healthcheck.status_code is defined
+        - env_update_healthcheck.status_code == 200
+      retries: 12
+      delay: 5

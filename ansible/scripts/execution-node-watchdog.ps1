@@ -95,29 +95,47 @@ function Test-TerminalRunning {
 }
 
 function Start-Mt5Terminal {
-    param([string]$ExecutablePath)
+    param(
+        [string]$ExecutablePath,
+        [switch]$UseScheduledTask
+    )
 
     if (-not (Test-Path $ExecutablePath)) {
         Write-WatchdogLog "MT5 terminal executable not found: $ExecutablePath"
         return $false
     }
 
-    $NormalizedPath = $ExecutablePath.ToLowerInvariant()
-    $ConfigPath = 'C:\SMA\mt5\sma-terminal.ini'
-    $LaunchCommand = "`"$ExecutablePath`""
-    if ($NormalizedPath -like '*\sma\mt5\*') {
-        if (Test-Path $ConfigPath) {
-            $LaunchCommand = "`"$ExecutablePath`" /portable /config:`"$ConfigPath`""
+    if ($UseScheduledTask) {
+        $Task = Get-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
+        if ($null -eq $Task) {
+            Write-WatchdogLog 'SMA-MT5-Terminal scheduled task not found; falling back to direct launch.'
         }
         else {
-            $LaunchCommand = "`"$ExecutablePath`" /portable"
+            if ($Task.State -eq 'Running') {
+                Stop-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
+            }
+            Start-ScheduledTask -TaskName 'SMA-MT5-Terminal' | Out-Null
+            return $true
         }
     }
-    elseif (Test-Path $ConfigPath) {
-        $LaunchCommand = "`"$ExecutablePath`" /config:`"$ConfigPath`""
+
+    $NormalizedPath = $ExecutablePath.ToLowerInvariant()
+    $ConfigPath = 'C:\SMA\mt5\sma-terminal.ini'
+    $ArgumentList = @()
+    if ($NormalizedPath -like '*\sma\mt5\*') {
+        $ArgumentList += '/portable'
+    }
+    if (Test-Path $ConfigPath) {
+        $ArgumentList += "/config:`"$ConfigPath`""
     }
 
-    Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', $LaunchCommand) | Out-Null
+    if ($ArgumentList.Count -gt 0) {
+        Start-Process -FilePath $ExecutablePath -ArgumentList $ArgumentList | Out-Null
+    }
+    else {
+        Start-Process -FilePath $ExecutablePath | Out-Null
+    }
     return $true
 }
 
@@ -140,7 +158,11 @@ function Ensure-TerminalPathsRunning {
         }
 
         Write-WatchdogLog "Starting terminal ($Reason): $Path"
-        if (Start-Mt5Terminal -ExecutablePath $Path) {
+        $UseScheduledTask = (
+            $Reason -eq 'default API' -and
+            ($Path.ToLowerInvariant() -like '*\program files\metatrader 5\terminal64.exe')
+        )
+        if (Start-Mt5Terminal -ExecutablePath $Path -UseScheduledTask:$UseScheduledTask) {
             Start-Sleep -Seconds $Mt5StartupWaitSeconds
             if (Test-TerminalRunning -ExecutablePath $Path) {
                 Write-WatchdogLog "Terminal started successfully ($Reason): $Path"

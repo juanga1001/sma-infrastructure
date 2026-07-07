@@ -43,7 +43,8 @@ if (-not $Found) {
     $Updated += $NewLine
 }
 
-Set-Content -Path $EnvFilePath -Value $Updated -Encoding UTF8
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+[System.IO.File]::WriteAllLines($EnvFilePath, $Updated, $Utf8NoBomEncoding)
 
 @{
     env_file = $EnvFilePath
