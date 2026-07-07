@@ -87,17 +87,46 @@
       register: api_task
       changed_when: false
 
-    - name: Verify MetaTrader 5 process is running
+    - name: Verify required deployment MT5 terminals are running
       ansible.windows.win_powershell:
         script: |
-          $Processes = @(Get-Process -Name "terminal64" -ErrorAction SilentlyContinue)
-          if ($Processes.Count -eq 0) {
-              throw "MetaTrader 5 process is not running: terminal64.exe"
+          $Headers = @{ 'X-API-Key' = '{{ execution_node_api_key }}' }
+          $Response = Invoke-RestMethod `
+              -Uri 'http://localhost:8000/ops/watchdog/terminals' `
+              -Headers $Headers `
+              -TimeoutSec 10
+          $RequiredPaths = @($Response.terminal_paths)
+
+          if ($RequiredPaths.Count -eq 0) {
+              $Ansible.Result = @{
+                  required_terminal_count = 0
+                  message = 'No active deployment terminals required.'
+              }
+              return
+          }
+
+          $MissingPaths = @()
+          foreach ($Path in $RequiredPaths) {
+              $NormalizedPath = $Path.ToLowerInvariant()
+              $Running = @(
+                  Get-CimInstance Win32_Process -Filter "Name = 'terminal64.exe'" -ErrorAction SilentlyContinue |
+                  Where-Object {
+                      $_.ExecutablePath -and
+                      ($_.ExecutablePath.ToLowerInvariant() -eq $NormalizedPath)
+                  }
+              )
+              if ($Running.Count -eq 0) {
+                  $MissingPaths += $Path
+              }
+          }
+
+          if ($MissingPaths.Count -gt 0) {
+              throw "Required MT5 terminals are not running: $($MissingPaths -join ', ')"
           }
 
           $Ansible.Result = @{
-              process = "terminal64.exe"
-              count = $Processes.Count
+              required_terminal_count = $RequiredPaths.Count
+              terminal_paths = $RequiredPaths
           }
       register: mt5_process
       changed_when: false

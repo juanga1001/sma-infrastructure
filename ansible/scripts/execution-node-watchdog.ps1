@@ -2,7 +2,7 @@ param(
     [string]$LogDirectory = 'C:\SMA\logs',
     [string]$LogFileName = 'execution-node-watchdog.log',
     [string]$ExecutionNodeTaskName = 'SMA-Execution-Node',
-    [string]$Mt5TaskName = 'SMA-MT5-Terminal',
+    [string]$EnvFilePath = 'C:\SMA\sma-execution-node\.env',
     [int]$HealthTimeoutSeconds = 5,
     [int]$Mt5StartupWaitSeconds = 20
 )
@@ -19,6 +19,22 @@ function Write-WatchdogLog {
     "$Timestamp $Message" | Add-Content -Path $LogPath
 }
 
+function Get-ExecutionNodeApiKey {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return $null
+    }
+
+    foreach ($Line in Get-Content $Path) {
+        if ($Line -match '^\s*EXECUTION_NODE_API_KEY\s*=\s*(.+)\s*$') {
+            return $Matches[1].Trim().Trim('"').Trim("'")
+        }
+    }
+
+    return $null
+}
+
 function Test-ExecutionNodeHealth {
     try {
         $Response = Invoke-WebRequest `
@@ -32,11 +48,45 @@ function Test-ExecutionNodeHealth {
     }
 }
 
-function Restart-ScheduledTaskSafely {
-    param(
-        [string]$TaskName,
-        [switch]$KillTerminalProcesses
+function Get-RequiredTerminalPaths {
+    param([string]$ApiKey)
+
+    $Headers = @{ 'X-API-Key' = $ApiKey }
+    $Response = Invoke-RestMethod `
+        -Uri 'http://localhost:8000/ops/watchdog/terminals' `
+        -Headers $Headers `
+        -TimeoutSec $HealthTimeoutSeconds
+    return @($Response.terminal_paths)
+}
+
+function Test-TerminalRunning {
+    param([string]$ExecutablePath)
+
+    $NormalizedPath = $ExecutablePath.ToLowerInvariant()
+    $Processes = @(
+        Get-CimInstance Win32_Process -Filter "Name = 'terminal64.exe'" -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.ExecutablePath -and
+            ($_.ExecutablePath.ToLowerInvariant() -eq $NormalizedPath)
+        }
     )
+    return $Processes.Count -gt 0
+}
+
+function Start-Mt5Terminal {
+    param([string]$ExecutablePath)
+
+    if (-not (Test-Path $ExecutablePath)) {
+        Write-WatchdogLog "MT5 terminal executable not found: $ExecutablePath"
+        return $false
+    }
+
+    Start-Process -FilePath $ExecutablePath | Out-Null
+    return $true
+}
+
+function Restart-ScheduledTaskSafely {
+    param([string]$TaskName)
 
     $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($null -eq $Task) {
@@ -53,12 +103,6 @@ function Restart-ScheduledTaskSafely {
         )
         foreach ($Process in $ApiProcesses) {
             Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
-        }
-    }
-
-    if ($KillTerminalProcesses) {
-        foreach ($Process in @(Get-Process -Name 'terminal64' -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -86,17 +130,38 @@ try {
         }
     }
 
-    if (@(Get-Process -Name 'terminal64' -ErrorAction SilentlyContinue).Count -eq 0) {
-        Write-WatchdogLog 'MetaTrader terminal64 is not running; restarting MT5 scheduled task.'
-        Restart-ScheduledTaskSafely -TaskName $Mt5TaskName -KillTerminalProcesses
-        Start-Sleep -Seconds $Mt5StartupWaitSeconds
+    $ApiKey = Get-ExecutionNodeApiKey -Path $EnvFilePath
+    if ($null -eq $ApiKey -or $ApiKey.Length -eq 0) {
+        Write-WatchdogLog "Execution Node API key not found in $EnvFilePath; skipping deployment terminal checks."
+    }
+    else {
+        try {
+            $RequiredPaths = Get-RequiredTerminalPaths -ApiKey $ApiKey
+            if ($RequiredPaths.Count -eq 0) {
+                Write-WatchdogLog 'No active deployment terminals required.'
+            }
+            else {
+                foreach ($Path in $RequiredPaths) {
+                    if (Test-TerminalRunning -ExecutablePath $Path) {
+                        Write-WatchdogLog "Terminal already running: $Path"
+                        continue
+                    }
 
-        $Mt5Count = @(Get-Process -Name 'terminal64' -ErrorAction SilentlyContinue).Count
-        if ($Mt5Count -gt 0) {
-            Write-WatchdogLog "MetaTrader terminal64 is running ($Mt5Count process(es))."
+                    Write-WatchdogLog "Starting terminal for active deployment: $Path"
+                    if (Start-Mt5Terminal -ExecutablePath $Path) {
+                        Start-Sleep -Seconds $Mt5StartupWaitSeconds
+                        if (Test-TerminalRunning -ExecutablePath $Path) {
+                            Write-WatchdogLog "Terminal started successfully: $Path"
+                        }
+                        else {
+                            Write-WatchdogLog "Terminal failed to start: $Path"
+                        }
+                    }
+                }
+            }
         }
-        else {
-            Write-WatchdogLog 'MetaTrader terminal64 is still not running after MT5 restart.'
+        catch {
+            Write-WatchdogLog "Failed to ensure active deployment terminals: $($_.Exception.Message)"
         }
     }
 

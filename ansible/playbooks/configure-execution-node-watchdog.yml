@@ -7,7 +7,7 @@
     watchdog_task_name: SMA-Execution-Node-Watchdog
     watchdog_script_path: C:\SMA\scripts\execution-node-watchdog.ps1
     execution_node_task_name: SMA-Execution-Node
-    mt5_task_name: SMA-MT5-Terminal
+    execution_node_env_path: C:\SMA\sma-execution-node\.env
 
   tasks:
     - name: Ensure SMA scripts directory exists
@@ -30,7 +30,7 @@
 
           $Action = New-ScheduledTaskAction `
               -Execute "powershell.exe" `
-              -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+              -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -EnvFilePath `"{{ execution_node_env_path }}`""
 
           # Task Scheduler rejects [TimeSpan]::MaxValue as repetition duration.
           $Trigger = New-ScheduledTaskTrigger `
@@ -57,7 +57,7 @@
               -Trigger $Trigger `
               -Principal $Principal `
               -Settings $Settings `
-              -Description "Restarts SMA Execution Node API and MT5 when local health checks fail." `
+              -Description "Restarts SMA Execution Node API when local health checks fail and ensures MT5 terminals for active deployments are running." `
               -Force | Out-Null
 
           $RegisteredTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
