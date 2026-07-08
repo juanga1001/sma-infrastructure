@@ -163,10 +163,8 @@
 
     - name: Wait for Execution Node API readiness
       ansible.windows.win_uri:
-        url: http://localhost:8000/health
+        url: http://localhost:8000/healthcheck
         method: GET
-        headers:
-          X-API-Key: "{{ execution_node_api_key }}"
         return_content: true
         status_code: 200
       register: deployment_health_response
@@ -177,12 +175,10 @@
         - (deployment_health_response.content | from_json).status == "ok"
       retries: 12
       delay: 5
-      no_log: true
 
     - name: Store deployment health response
       ansible.builtin.set_fact:
         deployment_health: "{{ deployment_health_response.content | from_json }}"
-      no_log: true
 
 
 

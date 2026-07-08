@@ -219,12 +219,7 @@ try {
     }
 
     if ($ConnectionTestsActive -gt 0) {
-        Write-WatchdogLog "Connection test in progress ($ConnectionTestsActive active); skipping API restart and default terminal checks."
-        $Mt5Task = Get-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
-        if ($null -ne $Mt5Task -and $Mt5Task.State -eq 'Running') {
-            Stop-ScheduledTask -TaskName 'SMA-MT5-Terminal' -ErrorAction SilentlyContinue
-            Write-WatchdogLog 'Stopped SMA-MT5-Terminal while connection test is active.'
-        }
+        Write-WatchdogLog "Connection test in progress ($ConnectionTestsActive active); skipping API restart and deployment terminal checks."
     }
     elseif (-not (Test-ExecutionNodeHealth)) {
         Write-WatchdogLog 'Execution Node healthcheck failed; restarting API scheduled task.'
@@ -239,19 +234,11 @@ try {
         }
     }
 
-    $DefaultTerminalPath = Get-DefaultTerminalPath -Path $EnvFilePath
-    if ($ConnectionTestsActive -gt 0) {
-        Write-WatchdogLog 'Skipping default API terminal check while connection test is active.'
-    }
-    elseif ($DefaultTerminalPath) {
-        Ensure-TerminalPathsRunning -TerminalPaths @($DefaultTerminalPath) -Reason 'default API'
-    }
-    else {
-        Write-WatchdogLog 'MT5_PATH not configured in Execution Node .env; skipping default terminal check.'
-    }
-
     if ($null -eq $ApiKey -or $ApiKey.Length -eq 0) {
         Write-WatchdogLog "Execution Node API key not found in $EnvFilePath; skipping deployment terminal checks."
+    }
+    elseif ($ConnectionTestsActive -gt 0) {
+        Write-WatchdogLog 'Skipping deployment terminal checks while connection test is active.'
     }
     else {
         try {

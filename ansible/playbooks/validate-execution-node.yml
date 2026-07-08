@@ -57,21 +57,6 @@
           vault/execution-node.yml file.
         quiet: true
 
-    - name: Verify SMA-MT5-Terminal scheduled task exists
-      ansible.windows.win_powershell:
-        script: |
-          $Task = Get-ScheduledTask -TaskName "SMA-MT5-Terminal" -ErrorAction SilentlyContinue
-          if ($null -eq $Task) {
-              throw "Scheduled task not found: SMA-MT5-Terminal"
-          }
-
-          $Ansible.Result = @{
-              name = $Task.TaskName
-              state = $Task.State.ToString()
-          }
-      register: mt5_task
-      changed_when: false
-
     - name: Verify SMA-Execution-Node scheduled task exists
       ansible.windows.win_powershell:
         script: |
@@ -166,14 +151,8 @@
       ansible.builtin.assert:
         that:
           - execution_node_health.status == "ok"
-        fail_msg: "Execution Node health endpoint did not return status=ok."
-        quiet: true
-
-    - name: Verify MT5 connection status
-      ansible.builtin.assert:
-        that:
-          - execution_node_health.mt5_connected | bool
-        fail_msg: "Execution Node health endpoint reported mt5_connected=false."
+          - execution_node_health.shared_market_data_enabled | default(false) | bool == false
+        fail_msg: "Execution Node health endpoint did not report the expected API-only status."
         quiet: true
 
     - name: Print Execution Node validation summary
@@ -183,10 +162,8 @@
           -------------------------
           WinRM: OK
           API Firewall Rule: OK
-          MT5 Task: OK
           API Task: OK
-          MT5 Process: OK
+          Deployment Terminals: OK
           Port 8000: OK
           Health Endpoint: OK
-          MT5 Connected: OK
-          MT5 MaxBars: {{ execution_node_health.mt5_max_bars | default("not reported") }}
+          Shared Market Data: Disabled
