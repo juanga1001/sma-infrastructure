@@ -136,8 +136,19 @@
           }
 
           if ($Task.State -eq "Running") {
-              Stop-ScheduledTask -TaskName $TaskName
-              Start-Sleep -Seconds 3
+              # Stop via Task Scheduler first, while it still owns the process
+              # cleanly. Killing the process out-of-band before this leaves
+              # Task Scheduler believing the task is still running, which
+              # makes Start-ScheduledTask a silent no-op (result code 267009 /
+              # SCHED_S_TASK_RUNNING).
+              Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+              $Deadline = (Get-Date).AddSeconds(10)
+              while ((Get-Date) -lt $Deadline) {
+                  if ((Get-ScheduledTask -TaskName $TaskName).State -ne "Running") {
+                      break
+                  }
+                  Start-Sleep -Milliseconds 500
+              }
           }
 
           $ApiProcesses = @(
@@ -148,7 +159,7 @@
               }
           )
           foreach ($Process in $ApiProcesses) {
-              Stop-Process -Id $Process.ProcessId -Force
+              Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
           }
 
           Start-ScheduledTask -TaskName $TaskName

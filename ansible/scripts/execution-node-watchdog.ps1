@@ -201,6 +201,22 @@ function Restart-ScheduledTaskSafely {
         throw "Scheduled task not found: $TaskName"
     }
 
+    if ($Task.State -eq 'Running') {
+        # Stop via Task Scheduler first, while it still owns the process
+        # cleanly. Killing the process out-of-band before this leaves Task
+        # Scheduler believing the task is still running, which makes
+        # Start-ScheduledTask a silent no-op (result code 267009 /
+        # SCHED_S_TASK_RUNNING) on every subsequent watchdog cycle.
+        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        $Deadline = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $Deadline) {
+            if ((Get-ScheduledTask -TaskName $TaskName).State -ne 'Running') {
+                break
+            }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
     if ($TaskName -eq $ExecutionNodeTaskName) {
         $ApiProcesses = @(
             Get-CimInstance Win32_Process |
@@ -212,11 +228,6 @@ function Restart-ScheduledTaskSafely {
         foreach ($Process in $ApiProcesses) {
             Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
         }
-    }
-
-    if ($Task.State -eq 'Running') {
-        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 3
     }
 
     Start-ScheduledTask -TaskName $TaskName
