@@ -5,18 +5,9 @@
 
   vars:
     sma_app_git_branch: main
-    sma_app_repo_path: /opt/sma/sma_app
-    sma_app_public_url: https://systematicmindacademy.com
     sma_app_health_check_path: /
     sma_app_compose_file: docker-compose.prod.yml
     sma_app_env_file: .env.production
-    sma_app_required_services:
-      - app
-      - web
-      - caddy
-      - db
-      - queue
-      - scheduler
 
   tasks:
     - name: Verify SMA App repository exists

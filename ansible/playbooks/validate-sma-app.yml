@@ -4,19 +4,10 @@
   gather_facts: false
 
   vars:
-    sma_app_repo_path: /opt/sma/sma_app
-    sma_app_public_url: https://systematicmindacademy.com
     sma_app_health_check_path: /
     sma_app_product_check_path: /products/build-trading-bots
     sma_app_compose_file: docker-compose.prod.yml
     sma_app_env_file: .env.production
-    sma_app_required_services:
-      - app
-      - web
-      - caddy
-      - db
-      - queue
-      - scheduler
 
   tasks:
     - name: Verify SSH connectivity
