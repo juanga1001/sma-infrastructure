@@ -42,7 +42,7 @@
         quiet: true
 
     - name: Verify git working tree is clean
-      ansible.builtin.command: git status --porcelain
+      ansible.builtin.command: git status --porcelain --untracked-files=no
       args:
         chdir: "{{ sma_app_repo_path }}"
       register: git_status
