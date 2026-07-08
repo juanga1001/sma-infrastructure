@@ -139,6 +139,24 @@ function Start-Mt5Terminal {
     return $true
 }
 
+function Enable-Mt5AlgoTradingAtPath {
+    param([string]$ExecutablePath)
+
+    $ScriptPath = 'C:\SMA\sma-execution-node\scripts\windows\enable-mt5-algo-trading-at-path.ps1'
+    if (-not (Test-Path $ScriptPath)) {
+        Write-WatchdogLog "Algo trading toggle script not found: $ScriptPath"
+        return
+    }
+
+    try {
+        & $ScriptPath -TerminalPath $ExecutablePath
+        Write-WatchdogLog "Algo trading toggle sent for terminal: $ExecutablePath"
+    }
+    catch {
+        Write-WatchdogLog "Failed to enable algo trading for $ExecutablePath : $($_.Exception.Message)"
+    }
+}
+
 function Ensure-TerminalPathsRunning {
     param(
         [string[]]$TerminalPaths,
@@ -166,6 +184,7 @@ function Ensure-TerminalPathsRunning {
             Start-Sleep -Seconds $Mt5StartupWaitSeconds
             if (Test-TerminalRunning -ExecutablePath $Path) {
                 Write-WatchdogLog "Terminal started successfully ($Reason): $Path"
+                Enable-Mt5AlgoTradingAtPath -ExecutablePath $Path
             }
             else {
                 Write-WatchdogLog "Terminal failed to start ($Reason): $Path"
@@ -208,18 +227,23 @@ try {
 
     $ApiKey = Get-ExecutionNodeApiKey -Path $EnvFilePath
     $ConnectionTestsActive = 0
+    $WatchdogStateUnavailable = $false
     if ($null -ne $ApiKey -and $ApiKey.Length -gt 0) {
         try {
             $WatchdogState = Get-WatchdogState -ApiKey $ApiKey
             $ConnectionTestsActive = [int]$WatchdogState.connection_tests_active
         }
         catch {
+            $WatchdogStateUnavailable = $true
             Write-WatchdogLog "Failed to read watchdog state: $($_.Exception.Message)"
         }
     }
 
     if ($ConnectionTestsActive -gt 0) {
         Write-WatchdogLog "Connection test in progress ($ConnectionTestsActive active); skipping API restart and deployment terminal checks."
+    }
+    elseif ($WatchdogStateUnavailable) {
+        Write-WatchdogLog 'Watchdog state unavailable; skipping API restart to avoid interrupting in-flight account connections.'
     }
     elseif (-not (Test-ExecutionNodeHealth)) {
         Write-WatchdogLog 'Execution Node healthcheck failed; restarting API scheduled task.'
@@ -239,6 +263,9 @@ try {
     }
     elseif ($ConnectionTestsActive -gt 0) {
         Write-WatchdogLog 'Skipping deployment terminal checks while connection test is active.'
+    }
+    elseif ($WatchdogStateUnavailable) {
+        Write-WatchdogLog 'Skipping deployment terminal checks while watchdog state is unavailable.'
     }
     else {
         try {
