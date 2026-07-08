@@ -61,6 +61,19 @@
           }
       register: mt5_template_copy
 
+
+    - name: Ensure SMA MT5 template config directory exists
+      ansible.windows.win_file:
+        path: "{{ mt5_terminal_template_dir }}\config"
+        state: directory
+
+    - name: Write SMA MT5 template bootstrap config
+      ansible.windows.win_copy:
+        dest: "{{ mt5_terminal_template_dir }}\config\common.ini"
+        content: |
+          [Common]
+          KeepPrivate=1
+
     - name: Print MT5 terminal template summary
       ansible.builtin.debug:
         msg: |-

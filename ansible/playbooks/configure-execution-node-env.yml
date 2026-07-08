@@ -105,24 +105,30 @@
           - {{ item.key }}={{ item.value }}
           {% endfor %}
 
-    - name: Restart default MT5 scheduled task after .env update
+    - name: Disable legacy default MT5 scheduled task
       ansible.windows.win_powershell:
         script: |
           $TaskName = 'SMA-MT5-Terminal'
           $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
           if ($null -eq $Task) {
-              throw "Scheduled task not found: $TaskName"
+              $Ansible.Result = @{ status = 'not_found' }
+              return
           }
+
           if ($Task.State -eq 'Running') {
               Stop-ScheduledTask -TaskName $TaskName
               Start-Sleep -Seconds 3
           }
-          Start-ScheduledTask -TaskName $TaskName
-          Start-Sleep -Seconds 20
-          $Running = @(
-              Get-CimInstance Win32_Process -Filter "Name = 'terminal64.exe'" -ErrorAction SilentlyContinue
-          ).Count
-          $Ansible.Result = @{ terminal_process_count = $Running }
+
+          Disable-ScheduledTask -TaskName $TaskName | Out-Null
+
+          Get-Process -Name 'terminal64' -ErrorAction SilentlyContinue |
+              Where-Object {
+                  $_.Path -and -not $_.Path.ToLower().StartsWith('C:\SMA\MT5'.ToLower())
+              } |
+              ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+          $Ansible.Result = @{ status = 'disabled' }
 
     - name: Restart Execution Node scheduled task after .env update
       ansible.windows.win_powershell:
