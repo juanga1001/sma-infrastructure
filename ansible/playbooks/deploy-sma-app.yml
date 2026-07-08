@@ -47,6 +47,8 @@
         chdir: "{{ sma_app_repo_path }}"
       register: git_status
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Fail when git working tree has local modifications
       ansible.builtin.assert:
@@ -65,6 +67,9 @@
       environment:
         GIT_TERMINAL_PROMPT: "0"
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
+      timeout: 30
 
     - name: Fetch latest remote state
       ansible.builtin.command: git fetch --all
@@ -72,6 +77,9 @@
         chdir: "{{ sma_app_repo_path }}"
       environment:
         GIT_TERMINAL_PROMPT: "0"
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
+      timeout: 60
 
     - name: Verify target branch exists on origin
       ansible.builtin.command: >-
@@ -80,6 +88,8 @@
       args:
         chdir: "{{ sma_app_repo_path }}"
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Checkout target branch
       ansible.builtin.command: >-
@@ -87,6 +97,8 @@
         origin/{{ sma_app_git_branch }}
       args:
         chdir: "{{ sma_app_repo_path }}"
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Pull latest target branch changes
       ansible.builtin.command: git pull origin {{ sma_app_git_branch }}
@@ -94,6 +106,9 @@
         chdir: "{{ sma_app_repo_path }}"
       environment:
         GIT_TERMINAL_PROMPT: "0"
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
+      timeout: 60
 
     - name: Capture deployment commit SHA
       ansible.builtin.command: git rev-parse HEAD
@@ -101,6 +116,8 @@
         chdir: "{{ sma_app_repo_path }}"
       register: deployment_commit_sha
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Capture deployment commit message
       ansible.builtin.command: git log --oneline -1
@@ -108,6 +125,8 @@
         chdir: "{{ sma_app_repo_path }}"
       register: deployment_commit_message
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Store deployment summary facts
       ansible.builtin.set_fact:
@@ -121,6 +140,10 @@
         chdir: "{{ sma_app_repo_path }}"
       register: prod_deploy
       changed_when: true
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
+      async: 1800
+      poll: 15
 
     - name: Wait for public site readiness
       ansible.builtin.uri:

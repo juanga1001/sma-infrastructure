@@ -17,11 +17,15 @@
       ansible.builtin.command: docker --version
       register: docker_version
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Verify Docker Compose is available
       ansible.builtin.command: docker compose version
       register: docker_compose_version
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Verify production environment file exists
       ansible.builtin.stat:
@@ -48,6 +52,8 @@
         chdir: "{{ sma_app_repo_path }}"
       register: compose_ps
       changed_when: false
+      become: true
+      become_user: "{{ sma_app_deploy_user }}"
 
     - name: Parse production container status
       ansible.builtin.set_fact:

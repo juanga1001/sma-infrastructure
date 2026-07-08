@@ -1,6 +1,7 @@
 ---
 sma_app_repo_path: /var/www/sma-app
 sma_app_public_url: https://systematicmindacademy.com
+sma_app_deploy_user: juanga
 sma_app_required_services:
   - app
   - web
