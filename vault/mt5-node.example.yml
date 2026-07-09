@@ -1,0 +1,11 @@
+# SMA MT5 Linux container node secrets (orchestrator) — TEMPLATE.
+# Copy to vault/mt5-node.yml and fill in. The real file is gitignored.
+#
+# Generate strong values with:  python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Shared API key Portfolio Lab uses to call the orchestrator management API.
+orchestrator_api_key: CHANGE_ME
+
+# Secret used to sign short-lived VNC access tokens. Must match whatever mints
+# tokens (the orchestrator) and, if a separate gateway is added, that gateway.
+vnc_token_secret: CHANGE_ME
