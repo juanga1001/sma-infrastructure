@@ -1,0 +1,58 @@
+---
+- name: Deploy MT5 broker terminal containers
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    mt5_image: ghcr.io/gmag11/metatrader5-docker:latest
+    mt5_container_memory: 2g
+    # One container per broker account. Each gets its own network namespace
+    # (so MT5 build 5968's fixed IPC port 22346 no longer collides), its own
+    # persistent /config volume (Wine prefix + saved broker session), and its
+    # VNC + Python-bridge ports bound to localhost only (reach via SSH tunnel).
+    mt5_accounts:
+      - id: "10044152"
+        vnc_port: 3101
+        bridge_port: 8101
+      - id: "10049781"
+        vnc_port: 3102
+        bridge_port: 8102
+
+  tasks:
+    - name: Pull MT5 Docker image
+      community.docker.docker_image:
+        name: "{{ mt5_image }}"
+        source: pull
+
+    - name: Ensure a persistent config volume exists per account
+      community.docker.docker_volume:
+        name: "mt5-{{ item.id }}-config"
+      loop: "{{ mt5_accounts }}"
+      loop_control:
+        label: "mt5-{{ item.id }}-config"
+
+    - name: Run one MT5 terminal container per account
+      community.docker.docker_container:
+        name: "mt5-{{ item.id }}"
+        image: "{{ mt5_image }}"
+        state: started
+        restart_policy: unless-stopped
+        memory: "{{ mt5_container_memory }}"
+        published_ports:
+          - "127.0.0.1:{{ item.vnc_port }}:3000"
+          - "127.0.0.1:{{ item.bridge_port }}:8001"
+        volumes:
+          - "mt5-{{ item.id }}-config:/config"
+      loop: "{{ mt5_accounts }}"
+      loop_control:
+        label: "mt5-{{ item.id }}"
+
+    - name: Print MT5 container deployment summary
+      ansible.builtin.debug:
+        msg: |-
+          MT5 Containers Deployed on {{ inventory_hostname }}
+          {% for a in mt5_accounts %}
+          - mt5-{{ a.id }}: VNC 127.0.0.1:{{ a.vnc_port }} | bridge 127.0.0.1:{{ a.bridge_port }} | volume mt5-{{ a.id }}-config
+          {% endfor %}
+          First boot downloads Wine Mono + MT5 + Python (~5 min per container).

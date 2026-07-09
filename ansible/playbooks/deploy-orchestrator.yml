@@ -1,0 +1,93 @@
+---
+- name: Deploy SMA MT5 container orchestrator
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    orchestrator_image: sma-mt5-orchestrator:latest
+    orchestrator_container: sma-orchestrator
+    orchestrator_port: 8000
+    mt5_network: sma-mt5-net
+    mt5_image_name: sma-mt5-terminal:latest
+    mt5_golden_volume: mt5-golden
+    build_context: /opt/sma/orchestrator-build
+    repo_root: "{{ playbook_dir }}/../../../sma-execution-node"
+
+  tasks:
+    - name: Verify orchestrator secrets are provided
+      ansible.builtin.assert:
+        that:
+          - orchestrator_api_key is defined and orchestrator_api_key | length > 16
+          - vnc_token_secret is defined and vnc_token_secret | length > 16
+        fail_msg: >-
+          orchestrator_api_key and vnc_token_secret must be set in
+          vault/execution-node.yml.
+        quiet: true
+
+    - name: Ensure orchestrator build context exists
+      ansible.builtin.file:
+        path: "{{ build_context }}/src"
+        state: directory
+        mode: "0755"
+
+    - name: Copy orchestrator build files
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: "{{ repo_root }}/docker/orchestrator/", dest: "{{ build_context }}/docker/orchestrator/" }
+        - { src: "{{ repo_root }}/src/orchestrator/", dest: "{{ build_context }}/src/orchestrator/" }
+        - { src: "{{ repo_root }}/src/__init__.py", dest: "{{ build_context }}/src/__init__.py" }
+
+    - name: Build orchestrator image
+      community.docker.docker_image:
+        name: "{{ orchestrator_image }}"
+        source: build
+        force_source: true
+        build:
+          path: "{{ build_context }}"
+          dockerfile: docker/orchestrator/Dockerfile
+          pull: true
+
+    - name: Ensure MT5 container network exists
+      community.docker.docker_network:
+        name: "{{ mt5_network }}"
+        driver: bridge
+
+    - name: Run orchestrator container
+      community.docker.docker_container:
+        name: "{{ orchestrator_container }}"
+        image: "{{ orchestrator_image }}"
+        state: started
+        recreate: true
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ mt5_network }}"
+        published_ports:
+          - "{{ orchestrator_port }}:8000"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock"
+        env:
+          SMA_ORCHESTRATOR_API_KEY: "{{ orchestrator_api_key }}"
+          SMA_VNC_TOKEN_SECRET: "{{ vnc_token_secret }}"
+          SMA_MT5_IMAGE: "{{ mt5_image_name }}"
+          SMA_MT5_GOLDEN_VOLUME: "{{ mt5_golden_volume }}"
+          SMA_MT5_NETWORK: "{{ mt5_network }}"
+
+    - name: Wait for orchestrator health
+      ansible.builtin.uri:
+        url: "http://localhost:{{ orchestrator_port }}/api/health"
+        status_code: 200
+      register: orch_health
+      retries: 15
+      delay: 3
+      until: orch_health.status == 200
+
+    - name: Print orchestrator summary
+      ansible.builtin.debug:
+        msg: |-
+          SMA MT5 Orchestrator deployed on {{ inventory_hostname }}
+          API + VNC gateway: http://{{ ansible_host }}:{{ orchestrator_port }}
+          Health: {{ orch_health.json.status | default('unknown') }}

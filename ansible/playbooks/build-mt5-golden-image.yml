@@ -1,0 +1,88 @@
+---
+- name: Build SMA MT5 terminal image and golden template volume
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    mt5_image_name: sma-mt5-terminal:latest
+    mt5_golden_volume: mt5-golden
+    mt5_build_context: /opt/sma/mt5-terminal
+    # Local path to the image build context in the sma-execution-node repo.
+    mt5_build_src: "{{ playbook_dir }}/../../../sma-execution-node/docker/mt5-terminal/"
+
+  tasks:
+    - name: Ensure build context directory exists on host
+      ansible.builtin.file:
+        path: "{{ mt5_build_context }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy MT5 terminal image build context
+      ansible.builtin.copy:
+        src: "{{ mt5_build_src }}"
+        dest: "{{ mt5_build_context }}/"
+        mode: "0644"
+
+    - name: Make start.sh executable in build context
+      ansible.builtin.file:
+        path: "{{ mt5_build_context }}/start.sh"
+        mode: "0755"
+
+    - name: Build SMA MT5 terminal image
+      community.docker.docker_image:
+        name: "{{ mt5_image_name }}"
+        source: build
+        force_source: true
+        build:
+          path: "{{ mt5_build_context }}"
+          pull: true
+
+    - name: Check whether the golden volume is already populated
+      ansible.builtin.command: docker volume inspect {{ mt5_golden_volume }}
+      register: golden_inspect
+      changed_when: false
+      failed_when: false
+
+    - name: Build golden template volume (first boot installs the pinned stack)
+      when: golden_inspect.rc != 0
+      block:
+        - name: Remove any stale golden-build container
+          community.docker.docker_container:
+            name: mt5-golden-build
+            state: absent
+            force_kill: true
+
+        - name: Start golden-build container on a fresh volume
+          community.docker.docker_container:
+            name: mt5-golden-build
+            image: "{{ mt5_image_name }}"
+            state: started
+            memory: 2g
+            published_ports:
+              - "127.0.0.1:8099:8001"
+            volumes:
+              - "{{ mt5_golden_volume }}:/config"
+
+        - name: Wait for the pinned bridge to come up (first-boot install ~5 min)
+          ansible.builtin.shell: |
+            docker logs mt5-golden-build 2>&1 | grep -q "mt5linux server running"
+          register: golden_ready
+          retries: 40
+          delay: 20
+          until: golden_ready.rc == 0
+          changed_when: false
+
+        - name: Stop the golden-build container (keep the populated volume)
+          community.docker.docker_container:
+            name: mt5-golden-build
+            state: absent
+            force_kill: true
+
+    - name: Report golden image/volume status
+      ansible.builtin.debug:
+        msg: |-
+          SMA MT5 golden image ready
+          Image: {{ mt5_image_name }}
+          Golden volume: {{ mt5_golden_volume }} ({{ 'reused (already populated)' if golden_inspect.rc == 0 else 'built fresh' }})
+          Per-account provisioning clones this volume for seconds-scale startup.
