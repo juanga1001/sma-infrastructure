@@ -5,3 +5,4 @@ vault/*
 !vault/README.md
 !vault/execution-node.example.yml
 !vault/sma-app.example.yml
+!vault/mt5-node.example.yml
