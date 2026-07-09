@@ -1,0 +1,63 @@
+---
+- name: Deploy TLS front (Caddy) for the MT5 orchestrator gateway
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    mt5_gateway_domain: mt5.systematicmindacademy.com
+    orchestrator_local: 127.0.0.1:8000
+
+  tasks:
+    - name: Install Caddy signing key
+      ansible.builtin.get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+        dest: /etc/apt/keyrings/caddy.asc
+        mode: "0644"
+
+    - name: Add Caddy apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [signed-by=/etc/apt/keyrings/caddy.asc]
+          https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+        filename: caddy
+        state: present
+
+    - name: Install Caddy
+      ansible.builtin.apt:
+        name: caddy
+        state: present
+        update_cache: true
+
+    - name: Write Caddyfile (auto-HTTPS, reverse proxy to the orchestrator)
+      ansible.builtin.copy:
+        dest: /etc/caddy/Caddyfile
+        mode: "0644"
+        content: |
+          {{ mt5_gateway_domain }} {
+              reverse_proxy {{ orchestrator_local }}
+          }
+      register: caddyfile
+
+    - name: Ensure Caddy is enabled and restarted on config change
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+        state: "{{ 'restarted' if caddyfile.changed else 'started' }}"
+
+    - name: Wait for HTTPS to answer (Let's Encrypt issuance can take ~30s)
+      ansible.builtin.uri:
+        url: "https://{{ mt5_gateway_domain }}/api/health"
+        status_code: 200
+        validate_certs: true
+      register: tls_health
+      retries: 20
+      delay: 6
+      until: tls_health.status == 200
+
+    - name: Print TLS gateway summary
+      ansible.builtin.debug:
+        msg: |-
+          MT5 gateway TLS active
+          URL: https://{{ mt5_gateway_domain }}
+          Health: {{ tls_health.json.status | default('unknown') }}

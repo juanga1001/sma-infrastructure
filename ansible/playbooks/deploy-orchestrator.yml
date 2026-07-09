@@ -8,6 +8,9 @@
     orchestrator_image: sma-mt5-orchestrator:latest
     orchestrator_container: sma-orchestrator
     orchestrator_port: 8000
+    # Public URL the browser uses (TLS-terminated by Caddy; see
+    # deploy-mt5-gateway-tls.yml). Leave empty to fall back to request URL.
+    orchestrator_public_base_url: https://mt5.systematicmindacademy.com
     mt5_network: sma-mt5-net
     mt5_image_name: sma-mt5-terminal:latest
     mt5_golden_volume: mt5-golden
@@ -66,7 +69,8 @@
         networks:
           - name: "{{ mt5_network }}"
         published_ports:
-          - "{{ orchestrator_port }}:8000"
+          # Localhost only: the Caddy TLS front is the sole public entry.
+          - "127.0.0.1:{{ orchestrator_port }}:8000"
         volumes:
           - "/var/run/docker.sock:/var/run/docker.sock"
         env:
@@ -75,6 +79,7 @@
           SMA_MT5_IMAGE: "{{ mt5_image_name }}"
           SMA_MT5_GOLDEN_VOLUME: "{{ mt5_golden_volume }}"
           SMA_MT5_NETWORK: "{{ mt5_network }}"
+          SMA_PUBLIC_BASE_URL: "{{ orchestrator_public_base_url }}"
 
     - name: Wait for orchestrator health
       ansible.builtin.uri:
