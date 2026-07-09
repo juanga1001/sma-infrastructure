@@ -35,7 +35,12 @@
         mode: "0644"
         content: |
           {{ mt5_gateway_domain }} {
-              reverse_proxy {{ orchestrator_local }}
+              handle_path /engine/* {
+                  reverse_proxy 127.0.0.1:8100
+              }
+              handle {
+                  reverse_proxy {{ orchestrator_local }}
+              }
           }
       register: caddyfile
 

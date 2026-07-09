@@ -1,0 +1,85 @@
+---
+- name: Deploy SMA MT5 trading engine
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    repo_root: "{{ playbook_dir }}/../../../sma-execution-node"
+    build_context: /opt/sma/engine-build
+    engine_image: sma-mt5-engine:latest
+    engine_container: sma-engine
+    engine_port: 8100
+    mt5_network: sma-mt5-net
+
+  tasks:
+    - name: Verify engine secrets are configured
+      ansible.builtin.assert:
+        that:
+          - orchestrator_api_key is defined
+          - orchestrator_api_key | length >= 32
+        fail_msg: >-
+          orchestrator_api_key is missing. Configure vault/mt5-node.yml and
+          pass it with -e @vault/mt5-node.yml.
+        quiet: true
+
+    - name: Ensure engine build context exists
+      ansible.builtin.file:
+        path: "{{ build_context }}"
+        state: directory
+
+    - name: Copy engine build files
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: preserve
+      loop:
+        - { src: "{{ repo_root }}/docker/engine/", dest: "{{ build_context }}/docker/engine/" }
+        - { src: "{{ repo_root }}/src/", dest: "{{ build_context }}/src/" }
+
+    - name: Build engine image
+      community.docker.docker_image:
+        name: "{{ engine_image }}"
+        source: build
+        force_source: true
+        build:
+          path: "{{ build_context }}"
+          dockerfile: docker/engine/Dockerfile
+
+    - name: Ensure engine data volume exists
+      community.docker.docker_volume:
+        name: sma-engine-data
+
+    - name: Run engine container
+      community.docker.docker_container:
+        name: "{{ engine_container }}"
+        image: "{{ engine_image }}"
+        state: started
+        recreate: true
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ mt5_network }}"
+        published_ports:
+          # Localhost only: the Caddy TLS front is the sole public entry.
+          - "127.0.0.1:{{ engine_port }}:8100"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock"
+          - "sma-engine-data:/app/data"
+        env:
+          SMA_ENGINE_API_KEY: "{{ orchestrator_api_key }}"
+
+    - name: Wait for engine health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ engine_port }}/health"
+        status_code: 200
+      register: engine_health
+      retries: 12
+      delay: 5
+      until: engine_health.status == 200
+
+    - name: Print engine summary
+      ansible.builtin.debug:
+        msg: |-
+          SMA MT5 trading engine deployed on {{ inventory_hostname }}
+          Local API: http://127.0.0.1:{{ engine_port }} (public via Caddy /engine/*)
+          Health: {{ engine_health.json.status | default('unknown') }}
