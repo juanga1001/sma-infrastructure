@@ -114,7 +114,7 @@
 <div class="wrap">
   <p class="eyebrow">Systematic Mind Academy</p>
   <h1>Strategy Lab</h1>
-  <p class="updated">Updated Jul 11, 2026 · rounds 1–2 complete · round 3 queued</p>
+  <p class="updated">Updated Jul 11, 2026 · rounds 1–3 complete · round 4 running</p>
 
   <div class="live">
     <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
@@ -127,7 +127,7 @@
   Dukascopy data · $5,000 · 1% risk · compounding · zero fees/spread</p>
 
   <section>
-    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">3 / 20</span></div>
+    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">6 / 30</span></div>
     <div class="surv">
       <div class="strat">
         <div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
@@ -150,8 +150,29 @@
           <span><span class="yr">2023</span>&nbsp; PF <b>1.62</b> · WR <b>44.2%</b> · DD <b>−12.2%</b> · 265</span>
         </div>
       </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">First Pullback After Cross <span class="strat-market">· EURUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.95</b> · WR <b>49.3%</b> · DD <b>−6.6%</b> · 67</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.51</b> · WR <b>43.1%</b> · DD <b>−4.1%</b> · 58</span>
+        </div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Pin Bar at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>2.06</b> · WR <b>50.7%</b> · DD <b>−5.1%</b> · 69</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>2.06</b> · WR <b>50.9%</b> · DD <b>−4.0%</b> · 57</span>
+        </div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">IBS-RSI Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.82</b> · WR <b>74.2%</b> · DD <b>−4.3%</b> · 97</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>76.3%</b> · DD <b>−1.7%</b> · 76</span>
+        </div>
+      </div>
     </div>
-    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all three hold positions for hours, so spread hurts them far less than scalpers.</p>
+    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all six hold positions for hours, so spread hurts them far less than scalpers. <b>Caveat:</b> IBS-RSI Confluence is highly correlated with IBS Mean Reversion (same market, same IBS core) — run one or the other in a portfolio, not both.</p>
   </section>
 
   <section>
@@ -185,14 +206,32 @@
   </section>
 
   <section>
-    <div class="round-head"><h2>Round 3</h2><span class="tally">queued</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Ten new ideas — selection in progress</span><span class="chip wait">PENDING</span></div>
-      <div class="note" style="margin-top:4px">This page updates as results land. Themes under consideration: multi-timeframe confluence on index mean reversion, volatility-regime filters for the near-miss breakouts, and session-aware variants of the survivors.</div></div>
+    <div class="round-head"><h2>Round 3</h2><span class="tally">3 pass · 7 fail</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">First Pullback After Cross <span class="strat-market">· EURUSD 1h</span></span><span class="chip pass">PASS</span></div>
+      <div class="note" style="margin-top:4px">Passed with stock parameters — no tuning needed.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Pin Bar at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS — tuned</span></div>
+      <div class="note" style="margin-top:4px">Best metrics of the whole lab, but only 43 trades in 2023 (needs 52). One tuning pass — wick threshold 55% → 50% — lifted it to 69/57 trades while keeping PF 2.06 both years.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">IBS-RSI Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS — venue change</span></div>
+      <div class="note" style="margin-top:4px">Failed on US30 (2025 PF 1.07); its one tuning pass moved it to SPX500 where the IBS family lives — PF 1.82/1.54, WR ~75%. Correlated with IBS Mean Reversion (see caveat above).</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Stochastic Snapback <span class="strat-market">· US30 1h</span></span><span class="chip near">NEAR — 2025 PF 1.39 on SPX500</span></div>
+      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF 1.39 · WR 68% · DD −6.4%</span><span><span class="yr">2023</span>&nbsp; PF 1.50 · WR 65% · DD −4.0%</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Band Engulf <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 0.98</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Breakout Retest <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.23 / 1.20</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">ROC Momentum <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL — PF 1.07 / 1.38</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">ATR Ratio Breakout <span class="strat-market">· XAGUSD 1h</span></span><span class="chip fail">FAIL — PF 0.73</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Percentile Extreme <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL — frequency + PF</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Keltner Ride <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL — PF 0.93 · DD −17.4%</span></div></div>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>Round 4</h2><span class="tally">running</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Ten new ideas — screening in progress</span><span class="chip wait">PENDING</span></div>
+      <div class="note" style="margin-top:4px">Need 4 more survivors to hit the goal of 10. This page updates as results land.</div></div>
   </section>
 
   <footer>
     Screening runs on the real backtest engine (identical numbers to the platform UI).
-    Running tally: <b>3 of 20</b> ideas survived the strict two-year filter — an honest hit rate.
+    Running tally: <b>6 of 30</b> ideas survived the strict two-year filter — an honest hit rate.
     Discuss any strategy by name and round; each verdict cites the failing metric.
   </footer>
 </div>
