@@ -1,0 +1,198 @@
+<title>SMA Strategy Lab</title>
+<style>
+  :root {
+    --ink: #1b2129;
+    --paper: #f5f6f4;
+    --card: #ffffff;
+    --line: #dde1dc;
+    --muted: #6b7280;
+    --accent: #148f68;
+    --accent-soft: #e3f2ec;
+    --loss: #b8433f;
+    --near: #a3781f;
+    --near-soft: #f6ecd9;
+    --loss-soft: #f7e5e4;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8ebe7;
+      --paper: #12161d;
+      --card: #1a2029;
+      --line: #2a323d;
+      --muted: #8b95a1;
+      --accent: #2fc08f;
+      --accent-soft: #16302a;
+      --near: #d3a552;
+      --near-soft: #2e2718;
+      --loss: #e0706b;
+      --loss-soft: #33201f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e8ebe7; --paper: #12161d; --card: #1a2029; --line: #2a323d;
+    --muted: #8b95a1; --accent: #2fc08f; --accent-soft: #16302a;
+    --near: #d3a552; --near-soft: #2e2718; --loss: #e0706b; --loss-soft: #33201f;
+  }
+  :root[data-theme="light"] {
+    --ink: #1b2129; --paper: #f5f6f4; --card: #ffffff; --line: #dde1dc;
+    --muted: #6b7280; --accent: #148f68; --accent-soft: #e3f2ec;
+    --near: #a3781f; --near-soft: #f6ecd9; --loss: #b8433f; --loss-soft: #f7e5e4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.55 -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 20px 14px 56px; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 6px;
+  }
+  h1 {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 22px; line-height: 1.25; margin: 0 0 4px; text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .updated { color: var(--muted); font-size: 12.5px; margin: 0 0 20px; }
+  .live {
+    display: flex; flex-direction: column; gap: 8px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 14px 12px; margin-bottom: 26px;
+  }
+  .live-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+    display: inline-block; flex: none; align-self: center;
+  }
+  .live-title { font-weight: 600; }
+  .live-meta { color: var(--muted); font-size: 13px; }
+  .criteria {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; color: var(--muted);
+    border-left: 2px solid var(--line); padding-left: 10px; margin: 0 0 26px;
+  }
+  section { margin-bottom: 30px; }
+  .round-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 2px; }
+  .round-head h2 { font-size: 16px; margin: 0; }
+  .tally { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--muted); }
+  .strat { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .strat:last-child { border-bottom: 0; }
+  .strat-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .strat-name { font-weight: 600; font-size: 14.5px; }
+  .strat-market { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .chip {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.08em; padding: 3px 9px; border-radius: 999px;
+    flex: none;
+  }
+  .chip.pass { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+  .chip.fail { background: var(--loss-soft); color: var(--loss); }
+  .chip.near { background: var(--near-soft); color: var(--near); }
+  .chip.wait { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+  .metrics {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--muted);
+  }
+  .metrics b { color: var(--ink); font-weight: 600; }
+  .yr { font-size: 10.5px; letter-spacing: 0.1em; }
+  .surv {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-top: 12px;
+  }
+  .surv .strat { border-bottom: 1px solid var(--line); }
+  .surv .strat:last-child { border-bottom: 0; }
+  .note { color: var(--muted); font-size: 13px; }
+  .note b { color: var(--ink); }
+  footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+  a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Systematic Mind Academy</p>
+  <h1>Strategy Lab</h1>
+  <p class="updated">Updated Jul 11, 2026 · rounds 1–2 complete · round 3 queued</p>
+
+  <div class="live">
+    <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
+      <span class="live-meta">Portfolio 3 &amp; 4 · Previous Candle Trend Scalper ×5 markets · both EMA exits on</span></div>
+    <div class="live-row"><span class="live-meta">Accounts: Axi 5K + 50K demo · engine on sma-ubuntu-2 · platform at app.systematicmindacademy.com</span></div>
+  </div>
+
+  <p class="criteria">ACCEPTANCE — must hold in BOTH 2025 and 2023:<br>
+  PF &gt; 1.5 · win rate &gt; 30% · max DD &lt; 15% · ≥ 52 trades/yr<br>
+  Dukascopy data · $5,000 · 1% risk · compounding · zero fees/spread</p>
+
+  <section>
+    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">3 / 20</span></div>
+    <div class="surv">
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.53</b> · WR <b>70.7%</b> · DD <b>−4.6%</b> · 259</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.87</b> · WR <b>68.1%</b> · DD <b>−5.0%</b> · 210</span>
+        </div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Double Channel Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.58</b> · WR <b>72.8%</b> · DD <b>−4.7%</b> · 180</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.57</b> · WR <b>68.4%</b> · DD <b>−5.3%</b> · 158</span>
+        </div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Inside Bar Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.52</b> · WR <b>44.4%</b> · DD <b>−10.7%</b> · 259</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.62</b> · WR <b>44.2%</b> · DD <b>−12.2%</b> · 265</span>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all three hold positions for hours, so spread hurts them far less than scalpers.</p>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>Round 1</h2><span class="tally">1 pass · 9 fail</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">NR7 Volatility Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.25</span></div>
+      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.77</b> · WR 41% · DD −12.8%</span><span><span class="yr">2023</span>&nbsp; PF 1.25 · WR 33% · DD −9.2%</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">RSI-2 Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — PF 1.49 / 1.29</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Bollinger Squeeze <span class="strat-market">· EURUSD 1h</span></span><span class="chip near">NEAR — 2025 PF 1.15</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">EMA Trend Pullback <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Three Soldiers <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Range Expansion <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">NY Opening Range Breakout <span class="strat-market">· US30 15m</span></span><span class="chip fail">FAIL — PF 0.91</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">London Breakout <span class="strat-market">· GBPUSD 15m</span></span><span class="chip fail">FAIL — PF &lt; 1</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Keltner Fade <span class="strat-market">· USDJPY 1h</span></span><span class="chip fail">FAIL — too few trades</span></div></div>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>Round 2</h2><span class="tally">2 pass · 8 fail</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Double Channel Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Inside Bar Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">EMA Ribbon Pullback <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2025 PF 1.35</span></div>
+      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF 1.35 · WR 41% · DD −9.2%</span><span><span class="yr">2023</span>&nbsp; PF <b>1.70</b> · WR 45% · DD −9.4%</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Z-Score Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 1.25</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Spring Snapback <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — 2023 PF 1.11</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Donchian ATR Trail <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">RSI Regime Momentum <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Consecutive Down Pullback <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Percent-B Reversion <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Session Gap Fade <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.37</span></div></div>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>Round 3</h2><span class="tally">queued</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Ten new ideas — selection in progress</span><span class="chip wait">PENDING</span></div>
+      <div class="note" style="margin-top:4px">This page updates as results land. Themes under consideration: multi-timeframe confluence on index mean reversion, volatility-regime filters for the near-miss breakouts, and session-aware variants of the survivors.</div></div>
+  </section>
+
+  <footer>
+    Screening runs on the real backtest engine (identical numbers to the platform UI).
+    Running tally: <b>3 of 20</b> ideas survived the strict two-year filter — an honest hit rate.
+    Discuss any strategy by name and round; each verdict cites the failing metric.
+  </footer>
+</div>

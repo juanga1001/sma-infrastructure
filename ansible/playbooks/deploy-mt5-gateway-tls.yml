@@ -30,6 +30,12 @@
         state: present
         update_cache: true
 
+    - name: Publish the strategy-lab board
+      ansible.builtin.copy:
+        src: ../files/strategy-lab-board.html
+        dest: /opt/sma/lab/index.html
+        mode: "0644"
+
     - name: Write Caddyfile (auto-HTTPS, reverse proxy to the orchestrator)
       ansible.builtin.copy:
         dest: /etc/caddy/Caddyfile
@@ -45,6 +51,11 @@
           }
 
           {{ app_domain }} {
+              # Research results board (static, updated by ansible).
+              handle_path /lab* {
+                  root * /opt/sma/lab
+                  file_server
+              }
               # Backend API (path preserved: backend serves /api/v1/...).
               handle /api/* {
                   reverse_proxy 127.0.0.1:8080
