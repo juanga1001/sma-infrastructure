@@ -7,6 +7,7 @@
   vars:
     mt5_gateway_domain: mt5.systematicmindacademy.com
     orchestrator_local: 127.0.0.1:8000
+    app_domain: app.systematicmindacademy.com
 
   tasks:
     - name: Install Caddy signing key
@@ -40,6 +41,23 @@
               }
               handle {
                   reverse_proxy {{ orchestrator_local }}
+              }
+          }
+
+          {{ app_domain }} {
+              # Backend API (path preserved: backend serves /api/v1/...).
+              handle /api/* {
+                  reverse_proxy 127.0.0.1:8080
+              }
+              handle /docs* {
+                  reverse_proxy 127.0.0.1:8080
+              }
+              handle /openapi.json {
+                  reverse_proxy 127.0.0.1:8080
+              }
+              # Everything else -> the SPA frontend.
+              handle {
+                  reverse_proxy 127.0.0.1:5173
               }
           }
       register: caddyfile

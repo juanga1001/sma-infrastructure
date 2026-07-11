@@ -1,0 +1,130 @@
+---
+- name: Deploy portfolio-lab on sma-ubuntu-2 (co-located with execution)
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    repo_src: "{{ playbook_dir }}/../../../sma-portfolio-lab/"
+    repo_path: /opt/sma/portfolio-lab
+    db_dump_src: "{{ playbook_dir }}/../../../../scratchpad/portfolio_lab_dump.sql"
+    app_domain: app.systematicmindacademy.com
+
+  tasks:
+    - name: Ensure the deploy directory exists
+      ansible.builtin.file:
+        path: "{{ repo_path }}"
+        state: directory
+
+    - name: Sync portfolio-lab source to the server
+      ansible.posix.synchronize:
+        src: "{{ repo_src }}"
+        dest: "{{ repo_path }}/"
+        delete: true
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.venv"
+          - "--exclude=node_modules"
+          - "--exclude=frontend/node_modules"
+          - "--exclude=frontend/dist"
+          - "--exclude=backend/htmlcov"
+          - "--exclude=__pycache__"
+          - "--exclude=.env"
+          - "--exclude=.env.server"
+
+    - name: Write server environment file
+      ansible.builtin.copy:
+        dest: "{{ repo_path }}/.env.server"
+        mode: "0600"
+        content: |
+          ENVIRONMENT=production
+          DOMAIN={{ app_domain }}
+          FRONTEND_HOST=https://{{ app_domain }}
+          PROJECT_NAME=SMA Portfolio Lab
+          STACK_NAME=sma-portfolio-lab
+          BACKEND_CORS_ORIGINS=https://{{ app_domain }}
+          SECRET_KEY={{ portfolio_lab_secret_key }}
+          FIRST_SUPERUSER={{ portfolio_lab_superuser }}
+          FIRST_SUPERUSER_PASSWORD={{ portfolio_lab_superuser_password }}
+          POSTGRES_SERVER=db
+          POSTGRES_PORT=5432
+          POSTGRES_DB=sma_portfolio_lab
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD={{ portfolio_lab_postgres_password }}
+          SENTRY_DSN=
+          EXECUTION_NODE_URL=http://sma-engine:8100
+          EXECUTION_NODE_API_KEY={{ orchestrator_api_key }}
+          ORCHESTRATOR_URL=http://sma-orchestrator:8000
+          ORCHESTRATOR_API_KEY={{ orchestrator_api_key }}
+
+    - name: Build backend and frontend images
+      ansible.builtin.command: >-
+        docker compose -f compose.server.yml --env-file .env.server build
+      args:
+        chdir: "{{ repo_path }}"
+
+    - name: Start the database only
+      ansible.builtin.command: >-
+        docker compose -f compose.server.yml --env-file .env.server up -d db
+      args:
+        chdir: "{{ repo_path }}"
+
+    - name: Wait for the database to be healthy
+      ansible.builtin.command: >-
+        docker compose -f compose.server.yml --env-file .env.server ps db
+      args:
+        chdir: "{{ repo_path }}"
+      register: db_ps
+      until: "'healthy' in db_ps.stdout"
+      retries: 20
+      delay: 5
+      changed_when: false
+
+    - name: Detect whether data has already been restored
+      ansible.builtin.command: >-
+        docker compose -f compose.server.yml --env-file .env.server exec -T db
+        psql -U postgres -d sma_portfolio_lab -tAc
+        "SELECT to_regclass('public.account') IS NOT NULL"
+      args:
+        chdir: "{{ repo_path }}"
+      register: has_data
+      changed_when: false
+
+    - name: Copy the database dump to the server
+      ansible.builtin.copy:
+        src: "{{ db_dump_src }}"
+        dest: /opt/sma/portfolio_lab_dump.sql
+        mode: "0600"
+      when: "'t' not in has_data.stdout"
+
+    - name: Restore the database dump (first run only)
+      ansible.builtin.shell: >-
+        docker compose -f compose.server.yml --env-file .env.server exec -T db
+        psql -U postgres -d sma_portfolio_lab < /opt/sma/portfolio_lab_dump.sql
+      args:
+        chdir: "{{ repo_path }}"
+      when: "'t' not in has_data.stdout"
+
+    - name: Start the full stack (prestart migrations + backend + frontend)
+      ansible.builtin.command: >-
+        docker compose -f compose.server.yml --env-file .env.server up -d
+      args:
+        chdir: "{{ repo_path }}"
+
+    - name: Wait for the backend health endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/api/v1/utils/health-check/
+        status_code: 200
+      register: backend_health
+      retries: 24
+      delay: 5
+      until: backend_health.status == 200
+
+    - name: Print portfolio-lab deployment summary
+      ansible.builtin.debug:
+        msg: |-
+          portfolio-lab deployed on {{ inventory_hostname }}
+          backend: http://127.0.0.1:8080 (healthy)
+          frontend: http://127.0.0.1:5173
+          data restored: {{ 'existing (kept)' if 't' in has_data.stdout else 'from local dump' }}
+          Next: add the Caddy route + DNS for {{ app_domain }}.
