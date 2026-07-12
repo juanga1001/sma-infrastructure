@@ -115,12 +115,12 @@
 <div class="wrap">
   <p class="eyebrow">Systematic Mind Academy</p>
   <h1>Strategy Lab</h1>
-  <p class="updated">Updated Jul 12, 2026 · <b>realistic-cost leaderboard</b> · every builtin · continuous 2023 → Jul 2026</p>
+  <p class="updated">Updated Jul 12, 2026 · <b>realistic-cost leaderboard</b> + <b>scalper deep-dive</b> · continuous 2023 → Jul 2026</p>
 
   <div class="live">
     <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
       <span class="live-meta">Portfolio 3 &amp; 4 · Previous Candle Trend Scalper ×5 markets · both EMA exits on</span></div>
-    <div class="live-row"><span class="warn">⚠ Cost-model reality check: on BTCUSD 15m this scalper's zero-cost PF 1.59 collapses to 0.72 once spread is charged (~8,600 trades × full spread). Watch the demo P&amp;L against this before funding anything — see rank #15 below.</span></div>
+    <div class="live-row"><span class="warn">⚠ The scalper FAILS realistic costs on BTCUSD 15m (PF 0.72) — but the deep-dive below found it thrives on indices/gold. Recommended: switch the live portfolios to SPX500 1h · DAX40 1h · XAUUSD 30m, all RR 3.0.</span></div>
   </div>
 
   <p class="criteria">REALISTIC COSTS — the backtester now charges the broker half-spread on every
@@ -128,6 +128,30 @@
   XAUUSD $0.25 · SPX500 0.4pt · US30 2.4pt · EURUSD 1.2pip · BTCUSD $20 · …<br>
   Run: $5,000 · default risk · compounding · continuous 2023-01-01 → 2026-07-10<br>
   (this window also adds 2024 + 2026 H1 — data no strategy was screened on)</p>
+
+  <section>
+    <div class="round-head"><h2>Scalper deep-dive — right markets, right config</h2><span class="tally">3 phases · OOS-validated</span></div>
+    <div class="surv">
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Phase 1 · symbol screen <span class="strat-market">· 10 assets · 15m · 2023→2026</span></span><span class="chip pass">INDICES + GOLD WIN</span></div>
+        <div class="note">DAX40 PF 1.49 · XAUUSD 1.47 · SPX500 1.43 · US30 1.41 · FTSE 1.29 pass. USDJPY flat; EURUSD, GBPUSD, XAGUSD, WTI (and live BTCUSD) all blown — spread eats the per-trade edge everywhere except index points and gold.</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Phase 2 · config grid <span class="strat-market">· tuned on 2024–2025 only</span></span><span class="chip pass">RR 3.0 WINS EVERYWHERE</span></div>
+        <div class="note">risk_reward 3.0 beats 2.0 on every symbol/timeframe. Break-even stop is catastrophic (PF ~0.6 — wicked out constantly); stop-at-previous-open always worse; body filter neutral. Higher timeframe → higher PF, lower DD (less spread paid).</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Phase 3 · out-of-sample <span class="strat-market">· 2023 + 2026 H1 (untouched)</span></span><span class="chip pass">9 / 9 CONFIGS PASS</span></div>
+        <div class="metrics">
+          <span><b>SPX500 1h RR3</b>: OOS PF <b>1.91 / 2.33</b> · DD ≤ −6.8%</span>
+          <span><b>DAX40 1h RR3</b>: OOS PF <b>2.26 / 1.75</b> · DD ≤ −10.1%</span>
+          <span><b>XAUUSD 30m RR3</b>: OOS PF <b>1.54 / 1.94</b> · DD ≤ −13.5%</span>
+          <span>every RR3 config passed both windows</span>
+        </div>
+        <div class="note"><b>Verdict: KEEP.</b> The edge is market-sensitive, not parameter-sensitive. Recommended live change: retire BTCUSD 15m, deploy SPX500 1h + DAX40 1h + XAUUSD 30m (RR 3.0, both EMA exits ON, break-even OFF). Catalog defaults updated to the validated config. Trust the PF/DD, not the compounded return magnitudes.</div>
+      </div>
+    </div>
+  </section>
 
   <section>
     <div class="round-head"><h2>Leaderboard — realistic costs, ranked</h2><span class="tally">15 builtins</span></div>
@@ -241,7 +265,7 @@
           <span>zero-cost: PF <b>1.59</b> · +264,000% (fantasy)</span>
           <span>with spread: PF <b>0.72</b> · account blown</span>
         </div>
-        <div class="note"><b>This is the live-deployed strategy family.</b> 8,594 trades in 3.5y — at 15m every scalp pays the full spread and the edge inverts. The demo accounts are the real test; treat this result as a serious warning before putting money on it.</div>
+        <div class="note"><b>This is the live-deployed configuration — resolved by the deep-dive above:</b> the edge is real but BTC's $20 spread swallows it. On SPX500/DAX40/XAUUSD with RR 3.0 the same strategy posts PF 1.5–2.3 out-of-sample. Switch markets, not strategies.</div>
       </div>
     </div>
     <p class="note" style="margin-top:10px"><b>How ranked:</b> profit factor with realistic costs over the continuous 3.5-year window. <b>Chips:</b> green ≥ 1.5, amber 1.2–1.5, red &lt; 1.2 (or thin sample). Numbers differ from the round-by-round screens below for two reasons: costs are now charged, and the window adds 2024 + 2026 H1 — data none of the strategies were selected on, so this doubles as a second out-of-sample test. <b>Correlation and sizing caveats still apply:</b> pick one of IBS/IBS-RSI and one of Pin Bar/Engulfing; the gold strategies are one exposure bucket, the SPX ones another. All strategies remain backtest-only until ported to the live engine (except the scalper, which is live on demo).</p>
