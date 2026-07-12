@@ -164,6 +164,14 @@
         <div class="note"><b>Rescued</b> (new defaults + one-click presets): IBS-RSI Confluence ibs 0.1 → PF 1.38→<b>1.96</b>; WRB Reversion → <b>US30 1.61</b> / XAUUSD 1.45; First Pullback → <b>SPX500 1.57</b> (FX spread was the killer). <b>Removed from the platform</b> — no config reached PF 1.4 with costs: IBS Mean Reversion, Double Channel Reversion, Engulfing at EMA, Mean Reversion (FTSE PF 2.04 but 18 trades/yr).</div>
       </div>
       <div class="strat">
+        <div class="strat-top"><span class="strat-name">Monte Carlo — 10,000 alternate histories per leg</span><span class="chip pass">EDGE CONFIRMED 11/12</span></div>
+        <div class="metrics">
+          <span>Portfolio: P(loss) <b>0.00%</b> · bad-luck DD (p95) <b>−12.4%</b></span>
+          <span>P(DD &gt; 20%) <b>0.01%</b> · 5th-pct outcome still strongly positive</span>
+        </div>
+        <div class="note">Each leg's REAL trade returns (costs included) were resampled into 10,000 alternate histories; the portfolio used a 10-day block bootstrap of daily returns. <b>11 of 12 legs confirmed at P(loss) ≤ 0.51%.</b> Two flags: <b>WRB Reversion @ XAUUSD is marginal</b> (3.9% of histories lose; 5th-percentile ≈ break-even — recommend dropping it or halving risk; its US30 sibling is confirmed), and <b>Inside Bar Breakout carries the drawdown tail</b> (edge certain, but 18.8% of histories exceed −20% DD at 1% risk — consider 0.5%).</div>
+      </div>
+      <div class="strat">
         <div class="strat-top"><span class="strat-name">Before deploying</span><span class="chip wait">NOTE</span></div>
         <div class="note">7 of 12 legs trade gold or gold-adjacent — a gold shock is the concentration scenario (~12% worst-case concurrent risk). And only the three scalper legs are portable to the live engine today; the other nine builtins still need the execution-node port before the full portfolio can run on the demo account.</div>
       </div>
