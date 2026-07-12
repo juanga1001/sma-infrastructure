@@ -45,7 +45,6 @@
     font: 15px/1.55 -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   }
   .wrap { max-width: 680px; margin: 0 auto; padding: 20px 14px 56px; }
-  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
   .eyebrow {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
@@ -69,6 +68,7 @@
   }
   .live-title { font-weight: 600; }
   .live-meta { color: var(--muted); font-size: 13px; }
+  .warn { color: var(--loss); font-size: 13px; }
   .criteria {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 12px; color: var(--muted);
@@ -82,6 +82,7 @@
   .strat:last-child { border-bottom: 0; }
   .strat-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .strat-name { font-weight: 600; font-size: 14.5px; }
+  .rank { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; margin-right: 4px; }
   .strat-market { color: var(--muted); font-weight: 400; font-size: 13px; }
   .chip {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -114,264 +115,147 @@
 <div class="wrap">
   <p class="eyebrow">Systematic Mind Academy</p>
   <h1>Strategy Lab</h1>
-  <p class="updated">Updated Jul 11, 2026 · <b style="color:var(--accent)">GOAL REACHED — 10 of 10 survivors found</b> · 100 tests · 10 rounds</p>
+  <p class="updated">Updated Jul 12, 2026 · <b>realistic-cost leaderboard</b> · every builtin · continuous 2023 → Jul 2026</p>
 
   <div class="live">
     <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
       <span class="live-meta">Portfolio 3 &amp; 4 · Previous Candle Trend Scalper ×5 markets · both EMA exits on</span></div>
-    <div class="live-row"><span class="live-meta">Accounts: Axi 5K + 50K demo · engine on sma-ubuntu-2 · platform at app.systematicmindacademy.com</span></div>
+    <div class="live-row"><span class="warn">⚠ Cost-model reality check: on BTCUSD 15m this scalper's zero-cost PF 1.59 collapses to 0.72 once spread is charged (~8,600 trades × full spread). Watch the demo P&amp;L against this before funding anything — see rank #15 below.</span></div>
   </div>
 
-  <p class="criteria">ACCEPTANCE — must hold in BOTH 2025 and 2023:<br>
-  PF &gt; 1.5 · win rate &gt; 30% · max DD &lt; 15% · ≥ 52 trades/yr<br>
-  Dukascopy data · $5,000 · 1% risk · compounding · zero fees/spread</p>
+  <p class="criteria">REALISTIC COSTS — the backtester now charges the broker half-spread on every
+  fill (entries, exits, stops) + per-lot commission, per symbol:<br>
+  XAUUSD $0.25 · SPX500 0.4pt · US30 2.4pt · EURUSD 1.2pip · BTCUSD $20 · …<br>
+  Run: $5,000 · default risk · compounding · continuous 2023-01-01 → 2026-07-10<br>
+  (this window also adds 2024 + 2026 H1 — data no strategy was screened on)</p>
 
   <section>
-    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">10 / 100</span></div>
+    <div class="round-head"><h2>Leaderboard — realistic costs, ranked</h2><span class="tally">15 builtins</span></div>
     <div class="surv">
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#1</span>Trend Breakout <span class="strat-market">· XAUUSD 4h · 0.5% risk</span></span><span class="chip pass">PF 2.11</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.53</b> · WR <b>70.7%</b> · DD <b>−4.6%</b> · 259</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.87</b> · WR <b>68.1%</b> · DD <b>−5.0%</b> · 210</span>
+          <span>net <b>+36.5%</b> · WR <b>47.1%</b> · DD <b>−3.9%</b> · 155 trades</span>
+          <span>Sharpe <b>1.78</b> · prev. engine PF 1.43*</span>
+        </div>
+        <div class="note">*The old engine over-charged CFD fees; the realistic model is more accurate AND cheaper here. 4h holding period barely feels the spread.</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name"><span class="rank">#2</span>SMA Cross <span class="strat-market">· AAPL 1d</span></span><span class="chip near">PF 2.04 · thin</span></div>
+        <div class="metrics">
+          <span>net <b>+31.9%</b> · WR 30.0% · DD <b>−24.8%</b> · only 10 trades</span>
+          <span>Sharpe 0.69 · statistically meaningless sample</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">Double Channel Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#3</span>Spring Reversal <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PF 1.73</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.58</b> · WR <b>72.8%</b> · DD <b>−4.7%</b> · 180</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.57</b> · WR <b>68.4%</b> · DD <b>−5.3%</b> · 158</span>
+          <span>net <b>+223%</b> · WR <b>47.4%</b> · DD <b>−9.5%</b> · 331 trades</span>
+          <span>Sharpe <b>2.94</b> · zero-cost PF 1.84</span>
+        </div>
+        <div class="note">The strongest lab survivor under real costs — best Sharpe-to-drawdown of the stable.</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name"><span class="rank">#4</span>Turtle Soup Scalper <span class="strat-market">· XAUUSD 5m</span></span><span class="chip near">PF 1.55 · thin</span></div>
+        <div class="metrics">
+          <span>net <b>+10.5%</b> · WR 30.3% · DD −8.0% · only 33 trades</span>
+          <span>Sharpe 0.72 · zero-cost PF 1.62</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">Inside Bar Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#5</span>WRB Follow <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PF 1.52</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.52</b> · WR <b>44.4%</b> · DD <b>−10.7%</b> · 259</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.62</b> · WR <b>44.2%</b> · DD <b>−12.2%</b> · 265</span>
+          <span>net <b>+112%</b> · WR <b>44.1%</b> · DD <b>−11.9%</b> · 288 trades</span>
+          <span>Sharpe <b>2.13</b> · zero-cost PF 1.61</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">First Pullback After Cross <span class="strat-market">· EURUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#6</span>Inside Bar Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PF 1.50</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.95</b> · WR <b>49.3%</b> · DD <b>−6.6%</b> · 67</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.51</b> · WR <b>43.1%</b> · DD <b>−4.1%</b> · 58</span>
+          <span>net <b>+751%</b> · WR <b>44.3%</b> · DD <b>−16.4%</b> · 910 trades</span>
+          <span>Sharpe <b>3.12</b> · zero-cost PF 1.65</span>
+        </div>
+        <div class="note">Biggest compounder by far (910 trades at 1% risk), at the price of the deepest drawdown among the passers.</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name"><span class="rank">#7</span>Pin Bar at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">PF 1.46</span></div>
+        <div class="metrics">
+          <span>net <b>+75.6%</b> · WR 44.2% · DD −13.6% · 231 trades</span>
+          <span>Sharpe 1.75 · zero-cost PF 1.59</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">Pin Bar at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#8</span>IBS-RSI Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip near">PF 1.38</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>2.06</b> · WR <b>50.7%</b> · DD <b>−5.1%</b> · 69</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>2.06</b> · WR <b>50.9%</b> · DD <b>−4.0%</b> · 57</span>
+          <span>net <b>+17.3%</b> · WR <b>70.8%</b> · DD −6.9% · 308 trades</span>
+          <span>Sharpe 1.26 · zero-cost PF 1.51</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">IBS-RSI Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#9</span>IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">PF 1.34</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.82</b> · WR <b>74.2%</b> · DD <b>−4.3%</b> · 97</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>76.3%</b> · DD <b>−1.7%</b> · 76</span>
+          <span>net <b>+63.3%</b> · WR <b>66.6%</b> · DD −8.0% · 888 trades</span>
+          <span>Sharpe <b>1.97</b> · zero-cost PF 1.44</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">Engulfing at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#10</span>Double Channel Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">PF 1.34</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.81</b> · WR <b>46.2%</b> · DD <b>−7.2%</b> · 78</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.62</b> · WR <b>44.9%</b> · DD <b>−6.1%</b> · 78</span>
+          <span>net <b>+75.5%</b> · WR <b>68.4%</b> · DD −6.7% · 621 trades</span>
+          <span>Sharpe <b>1.98</b> · zero-cost PF 1.40</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">Spring Reversal <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#11</span>WRB Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">PF 1.26</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.90</b> · WR <b>48.3%</b> · DD <b>−4.4%</b> · 89</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>43.3%</b> · DD <b>−8.7%</b> · 97</span>
+          <span>net <b>+12.1%</b> · WR 66.4% · DD −7.9% · 241 trades</span>
+          <span>Sharpe 0.87 · zero-cost PF 1.35</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">WRB Follow <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#12</span>First Pullback After Cross <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">PF 1.21</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>2.20</b> · WR <b>51.3%</b> · DD <b>−3.9%</b> · 76</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>43.6%</b> · DD <b>−8.0%</b> · 94</span>
+          <span>net +32.0% · WR 41.7% · DD <b>−17.0%</b> · 216 trades</span>
+          <span>Sharpe 0.83 · zero-cost PF 1.43</span>
+        </div>
+        <div class="note">FX pip spreads bite hard on a 2R strategy — the biggest cost degradation of the lab stable.</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name"><span class="rank">#13</span>Engulfing at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">PF 1.18</span></div>
+        <div class="metrics">
+          <span>net +37.0% · WR 39.2% · DD <b>−17.5%</b> · 296 trades</span>
+          <span>Sharpe 0.84 · zero-cost PF 1.27</span>
+        </div>
+        <div class="note">Also weak zero-cost over the full window — 2024 + 2026 H1 were unkind. Prefer Pin Bar from this correlated pair.</div>
+      </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name"><span class="rank">#14</span>Mean Reversion <span class="strat-market">· SPX500 1h (NAS100 feed dead)</span></span><span class="chip fail">PF 0.88</span></div>
+        <div class="metrics">
+          <span>net −1.6% · WR 21.2% · DD −5.7% · 80 trades</span>
+          <span>designed for NAS100; loses on the SPX500 proxy</span>
         </div>
       </div>
       <div class="strat">
-        <div class="strat-top"><span class="strat-name">WRB Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="strat-top"><span class="strat-name"><span class="rank">#15</span>Previous Candle Trend Scalper <span class="strat-market">· BTCUSD 15m · both EMA exits</span></span><span class="chip fail">PF 0.72 ⚠</span></div>
         <div class="metrics">
-          <span><span class="yr">2025</span>&nbsp; PF <b>1.63</b> · WR <b>75.3%</b> · DD <b>−3.3%</b> · 73</span>
-          <span><span class="yr">2023</span>&nbsp; PF <b>2.88</b> · WR <b>74.1%</b> · DD <b>−1.7%</b> · 58</span>
+          <span>zero-cost: PF <b>1.59</b> · +264,000% (fantasy)</span>
+          <span>with spread: PF <b>0.72</b> · account blown</span>
         </div>
+        <div class="note"><b>This is the live-deployed strategy family.</b> 8,594 trades in 3.5y — at 15m every scalp pays the full spread and the edge inverts. The demo accounts are the real test; treat this result as a serious warning before putting money on it.</div>
       </div>
     </div>
-    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all ten hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio. <b>Venue concentration:</b> five survivors trade XAUUSD 1h and four trade SPX500 1h — size them as ONE gold bucket and ONE index bucket, not nine independent bets. <b>Next step:</b> all ten are backtest-only until ported to the live trading engine.</p>
+    <p class="note" style="margin-top:10px"><b>How ranked:</b> profit factor with realistic costs over the continuous 3.5-year window. <b>Chips:</b> green ≥ 1.5, amber 1.2–1.5, red &lt; 1.2 (or thin sample). Numbers differ from the round-by-round screens below for two reasons: costs are now charged, and the window adds 2024 + 2026 H1 — data none of the strategies were selected on, so this doubles as a second out-of-sample test. <b>Correlation and sizing caveats still apply:</b> pick one of IBS/IBS-RSI and one of Pin Bar/Engulfing; the gold strategies are one exposure bucket, the SPX ones another. All strategies remain backtest-only until ported to the live engine (except the scalper, which is live on demo).</p>
   </section>
 
   <section>
-    <div class="round-head"><h2>Round 1</h2><span class="tally">1 pass · 9 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">NR7 Volatility Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.25</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.77</b> · WR 41% · DD −12.8%</span><span><span class="yr">2023</span>&nbsp; PF 1.25 · WR 33% · DD −9.2%</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">RSI-2 Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — PF 1.49 / 1.29</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Bollinger Squeeze <span class="strat-market">· EURUSD 1h</span></span><span class="chip near">NEAR — 2025 PF 1.15</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">EMA Trend Pullback <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Three Soldiers <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Range Expansion <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">NY Opening Range Breakout <span class="strat-market">· US30 15m</span></span><span class="chip fail">FAIL — PF 0.91</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">London Breakout <span class="strat-market">· GBPUSD 15m</span></span><span class="chip fail">FAIL — PF &lt; 1</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Keltner Fade <span class="strat-market">· USDJPY 1h</span></span><span class="chip fail">FAIL — too few trades</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 2</h2><span class="tally">2 pass · 8 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Double Channel Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Inside Bar Breakout <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">EMA Ribbon Pullback <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2025 PF 1.35</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF 1.35 · WR 41% · DD −9.2%</span><span><span class="yr">2023</span>&nbsp; PF <b>1.70</b> · WR 45% · DD −9.4%</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Z-Score Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 1.25</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Spring Snapback <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — 2023 PF 1.11</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Donchian ATR Trail <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">RSI Regime Momentum <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Consecutive Down Pullback <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Percent-B Reversion <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Session Gap Fade <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.37</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 3</h2><span class="tally">3 pass · 7 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">First Pullback After Cross <span class="strat-market">· EURUSD 1h</span></span><span class="chip pass">PASS</span></div>
-      <div class="note" style="margin-top:4px">Passed with stock parameters — no tuning needed.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Pin Bar at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS — tuned</span></div>
-      <div class="note" style="margin-top:4px">Best metrics of the whole lab, but only 43 trades in 2023 (needs 52). One tuning pass — wick threshold 55% → 50% — lifted it to 69/57 trades while keeping PF 2.06 both years.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">IBS-RSI Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS — venue change</span></div>
-      <div class="note" style="margin-top:4px">Failed on US30 (2025 PF 1.07); its one tuning pass moved it to SPX500 where the IBS family lives — PF 1.82/1.54, WR ~75%. Correlated with IBS Mean Reversion (see caveat above).</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Stochastic Snapback <span class="strat-market">· US30 1h</span></span><span class="chip near">NEAR — 2025 PF 1.39 on SPX500</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF 1.39 · WR 68% · DD −6.4%</span><span><span class="yr">2023</span>&nbsp; PF 1.50 · WR 65% · DD −4.0%</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Band Engulf <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 0.98</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Breakout Retest <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.23 / 1.20</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">ROC Momentum <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL — PF 1.07 / 1.38</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">ATR Ratio Breakout <span class="strat-market">· XAGUSD 1h</span></span><span class="chip fail">FAIL — PF 0.73</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Percentile Extreme <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL — frequency + PF</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Keltner Ride <span class="strat-market">· BTCUSD 1h</span></span><span class="chip fail">FAIL — PF 0.93 · DD −17.4%</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 4</h2><span class="tally">1 pass · 9 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Engulfing at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
-      <div class="note" style="margin-top:4px">Passed with stock parameters. Correlated with Pin Bar at EMA (see caveat above).</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Three Down Reversal <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — no config passes both years</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF 1.47 · DD −6.9% (stock)</span><span><span class="yr">2023</span>&nbsp; PF 1.73 · DD −13.6%</span>
-      <span><span class="yr">2025</span>&nbsp; PF <b>2.10</b> · DD −6.7% (RR 2.5)</span><span><span class="yr">2023</span>&nbsp; PF 1.77 · DD <b>−17.0%</b> ✗</span></div>
-      <div class="note" style="margin-top:4px">Profitable in both years in both configs, but stock misses 2025 PF by 0.03 and the higher-R variant blows the 2023 drawdown cap. Removed per the rules; worth revisiting with a volatility-scaled stop.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Kijun Bounce <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.31 · DD −15.5%</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">RSI-2 Pullback <span class="strat-market">· US30 1h</span></span><span class="chip near">NEAR — 2025 PF 1.04</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Supertrend Pullback <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL — PF 1.39 / 1.36</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Bollinger Touch Reversion <span class="strat-market">· USDJPY 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.60</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">MACD Zero Momentum <span class="strat-market">· GBPUSD 1h</span></span><span class="chip fail">FAIL — PF 1.18 / 0.95</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Weekly Anchor Reversion <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL — PF + frequency</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Stochastic Trend Pullback <span class="strat-market">· USDJPY 1h</span></span><span class="chip fail">FAIL — PF 0.77 · DD −29.7%</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Daily EMA Pullback <span class="strat-market">· AUDUSD 1h</span></span><span class="chip fail">FAIL — PF &lt; 1 both years</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 5</h2><span class="tally">0 pass · 10 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">ADX Pullback <span class="strat-market">· US30 1h</span></span><span class="chip near">NEAR — 2023 PF 1.29</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.59</b> · WR 44% · DD −8.4%</span><span><span class="yr">2023</span>&nbsp; PF 1.29 · WR 40% · DD −8.7%</span></div>
-      <div class="note" style="margin-top:4px">Tuning (ADX ≥ 30) left 2023 at 1.30. US30 mean reversion / pullbacks have now near-missed four different ways — always one year short. Dropping US30 from the reversion search.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Double Weak Close <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2023 PF 1.19</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Bollinger Bounce <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 1.25</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Breakout Pullback 55 <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — 2023 PF 0.97</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">RSI Divergence <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL — 2025 PF 2.07 but 2023 PF 0.65</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Keltner Reversion <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — ~30 trades/yr</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">FX Dip Buy <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — 2025 PF 1.12</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Capitulation Fade <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL — PF 1.14 / 1.01</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Higher Low Breakout <span class="strat-market">· GBPUSD 1h</span></span><span class="chip fail">FAIL — PF 1.10 / 0.92</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Double Bottom Reclaim <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — too few trades</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 6</h2><span class="tally">1 pass · 9 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Spring Reversal <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
-      <div class="note" style="margin-top:4px">Wyckoff spring: a bar pierces the 20-bar low intrabar but closes back above it in an uptrend — a stop-run reversal. Passed with stock parameters. Anchors on the channel low, not the EMA, so it's mechanically distinct from the pin-bar/engulfing pair.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Gold Dip Buy <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.43 · DD −18.8%</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.52</b> · 325 trades (stock)</span><span><span class="yr">2023</span>&nbsp; PF 1.43 · DD −18.8% ✗</span>
-      <span><span class="yr">2025</span>&nbsp; PF <b>1.68</b> · 189 trades (3-bar dip)</span><span><span class="yr">2023</span>&nbsp; PF 1.41 · DD −15.5% ✗</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">EMA200 Retest <span class="strat-market">· GBPUSD 1h</span></span><span class="chip near">NEAR — only ~24 trades/yr</span></div>
-      <div class="note" style="margin-top:4px">PF 1.65 in 2025 but the setup is too rare; the frequency-directed tune reached only ~40/yr with PF falling. Removed.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Continuation Pullback <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — PF 1.29 / 1.41</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">RSI-3 Gold Reversion <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.29 / 1.15</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Morning Star at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF + frequency</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">ATR Stretch Fade <span class="strat-market">· AUDUSD 1h</span></span><span class="chip fail">FAIL — PF 1.07 / 1.24</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Hikkake <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — PF 1.08 / 0.83</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Channel Snapback <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL — PF &lt; 1 both years</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Trend Resume <span class="strat-market">· GBPUSD 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.61 · DD −21.2%</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 7</h2><span class="tally">0 pass · 10 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Bull Flag <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — only 28/23 trades</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.77</b> · WR 46% · DD −4.4%</span><span><span class="yr">2023</span>&nbsp; PF <b>1.51</b> · WR 43% · DD −3.2%</span></div>
-      <div class="note" style="margin-top:4px">Clears every metric in both years except trade count. Diluting the impulse filter destroyed 2023 (PF 0.84) — the honest frequency lever is the timeframe, so round 8 rescreens the unmodified mechanism on 30m.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">50% Pullback <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2025 PF 1.44 after tune</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Wick at Low <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 2.27, 2023 PF 1.26</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Second Low <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — 2025 PF 1.18</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">PD Level Sweep <span class="strat-market">· XAUUSD / SPX500 1h</span></span><span class="chip fail">FAIL — mirror-image years per venue</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Fresh EMA Fan <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.42 / 1.06</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Hammer Pair <span class="strat-market">· US30 1h</span></span><span class="chip fail">FAIL — 2023 PF 0.83</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Deep Pullback <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.93</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">WRB Follow <span class="strat-market">· GBPUSD 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.88</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 8</h2><span class="tally">0 pass · 10 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Stochastic Double Dip <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2025 PF 2.19, 2023 PF 1.33</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Wick at Low <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2025 PF 1.84, 2023 PF 1.33</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Cumulative RSI-2 <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — 2023 PF 1.14</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Doji at Low <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — 2025 PF 1.19 + frequency</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Bull Flag 30m rescreen <span class="strat-market">· XAUUSD 30m</span></span><span class="chip fail">FAIL — PF 1.09/0.99; the edge is 1h-specific</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Bull Flag FX venue <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.73</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">PDH Break Retest <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.03/1.23</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Weekly Open Fade <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF &lt; 1 both years</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Tight Coil Break <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.03/0.91</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">ATR Stretch Fade <span class="strat-market">· EURGBP 1h</span></span><span class="chip fail">NO DATA — EURGBP unsupported</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 9</h2><span class="tally">1 pass · 9 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">WRB Follow <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
-      <div class="note" style="margin-top:4px">Momentum follow-through of a 2-ATR wide-range bar closing in its top quintile; SL at the bar midpoint, 2R target. Failed on GBPUSD in round 7 — gold is its home. No EMA/channel anchor, so mechanically distinct from the other gold patterns.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Tweezer Bottom <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.49, missed by 0.01</span></div>
-      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.74</b> · WR 46% · DD −7.9% · 221</span><span><span class="yr">2023</span>&nbsp; PF 1.49 · WR 42% · DD −10.8% · 243</span></div>
-      <div class="note" style="margin-top:4px">The closest fail of the entire lab. One tuning pass allowed and spent — removed per the rules.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Spring Reversal → WTI <span class="strat-market">· transfer</span></span><span class="chip fail">FAIL — 2023 PF 2.26 but 2025 PF 1.24</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">IBS Mean Reversion → FTSE100 <span class="strat-market">· transfer</span></span><span class="chip fail">FAIL — PF 1.50 / 1.11</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">First Pullback → USDCHF / EURJPY <span class="strat-market">· transfers</span></span><span class="chip fail">FAIL — one year short each</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Pin Bar at EMA → XAGUSD <span class="strat-market">· transfer</span></span><span class="chip fail">FAIL — PF 1.03 / 1.43</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Velocity Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — 2025 PF 1.19 + frequency</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Channel Snapback <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — PF 1.41 / 1.29</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Three Down + IBS Exit <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — PF 1.19 / 1.22</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Takeaway</span><span class="chip near">INSIGHT</span></div>
-      <div class="note" style="margin-top:4px">All five market transfers of proven mechanisms failed — each survivor is married to its home market. That is good news for the survivors: they are not generic curve fits.</div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>Round 10 — final</h2><span class="tally">1 pass · 9 fail</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">WRB Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS — tuned</span></div>
-      <div class="note" style="margin-top:4px">A wide down bar closing in its bottom quintile above the EMA200, confirmed by an up close, bought at the next open; exit on the first strong close. Baseline had stellar quality (PF 1.75/2.74, WR ~75%) at only 38/33 trades; the tuning pass widened the net (range threshold 2.0 → 1.5 ATR) to 73/58 trades while quality held. Lowest drawdowns of the entire stable.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Deep Spring (72-bar) <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — PF 3.85/2.22 but 5/13 trades</span></div>
-      <div class="note" style="margin-top:4px">Spectacular but far too rare. Worth remembering for a multi-market or 4h context.</div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Doji Break at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.40</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Daily Spring Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — PF 1.44 both years</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Channel + IBS Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — PF 1.46 / 1.30</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Double Inside Break <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — 2023 PF 0.59</span></div></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Transfers: Spring → SPX500/US30 · WRB Follow → BTC · First Pullback → GBPJPY</span><span class="chip fail">FAIL — home-market effect again</span></div></div>
-  </section>
-
-  <section>
-    <div class="round-head"><h2>What's next</h2><span class="tally">engineering</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Port the ten survivors to the live trading engine</span><span class="chip wait">PENDING</span></div>
-      <div class="note" style="margin-top:4px">The builtins currently exist in the backtester only. Before any can trade a real account they must be implemented in the execution engine's strategy dispatcher (same signal logic, live bars), then validated on a demo account — the same path Previous Candle Trend Scalper took.</div></div>
+    <div class="round-head"><h2>Lab history — rounds 1–10 (zero-cost screening)</h2><span class="tally">10 / 100</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">How the ten were found</span><span class="chip wait">ARCHIVE</span></div>
+      <div class="note" style="margin-top:4px">Ten rounds of ten ideas each, screened zero-cost on 2025 (in-sample) and 2023 (out-of-sample) with a strict filter: PF &gt; 1.5, WR &gt; 30%, DD &lt; 15%, ≥ 52 trades/yr — in BOTH years, one honest tuning pass per near-miss. Survivors by round — R1: IBS Mean Reversion. R2: Double Channel Reversion, Inside Bar Breakout. R3: First Pullback, Pin Bar at EMA, IBS-RSI Confluence. R4: Engulfing at EMA. R5: shutout. R6: Spring Reversal. R7: shutout (Bull Flag passed everything but frequency). R8: shutout. R9: WRB Follow (all five market transfers of proven mechanisms failed — each edge is married to its home market). R10: WRB Reversion. Closest miss of the lab: Tweezer Bottom, 2023 PF 1.49 — by 0.01. Full per-round tables live in the repo docs (docs/strategy-lab-round*-2026-07.md).</div></div>
   </section>
 
   <footer>
-    Screening runs on the real backtest engine (identical numbers to the platform UI).
-    Final tally: <b>10 of 100</b> ideas survived the strict two-year filter — an honest 10% hit rate across ten rounds.
-    Discuss any strategy by name and round; each verdict cites the failing metric.
+    Screening and the leaderboard run on the real backtest engine (identical numbers to the platform UI, which now defaults to realistic costs).
+    Zero-fee hit rate was <b>10 of 100</b>; under realistic costs and the extended window, <b>4 of 15</b> builtins hold PF ≥ 1.5.
+    Spread assumptions are typical Axi-standard averages — verify against your account's live spreads.
   </footer>
 </div>
