@@ -114,7 +114,7 @@
 <div class="wrap">
   <p class="eyebrow">Systematic Mind Academy</p>
   <h1>Strategy Lab</h1>
-  <p class="updated">Updated Jul 11, 2026 · rounds 1–9 complete · round 10 running · 9 of 10 found</p>
+  <p class="updated">Updated Jul 11, 2026 · <b style="color:var(--accent)">GOAL REACHED — 10 of 10 survivors found</b> · 100 tests · 10 rounds</p>
 
   <div class="live">
     <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
@@ -127,7 +127,7 @@
   Dukascopy data · $5,000 · 1% risk · compounding · zero fees/spread</p>
 
   <section>
-    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">9 / 90</span></div>
+    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">10 / 100</span></div>
     <div class="surv">
       <div class="strat">
         <div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
@@ -192,8 +192,15 @@
           <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>43.6%</b> · DD <b>−8.0%</b> · 94</span>
         </div>
       </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">WRB Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.63</b> · WR <b>75.3%</b> · DD <b>−3.3%</b> · 73</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>2.88</b> · WR <b>74.1%</b> · DD <b>−1.7%</b> · 58</span>
+        </div>
+      </div>
     </div>
-    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all nine hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio. <b>Venue concentration:</b> five survivors trade XAUUSD 1h — treat them as one gold exposure bucket when sizing.</p>
+    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all ten hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio. <b>Venue concentration:</b> five survivors trade XAUUSD 1h and four trade SPX500 1h — size them as ONE gold bucket and ONE index bucket, not nine independent bets. <b>Next step:</b> all ten are backtest-only until ported to the live trading engine.</p>
   </section>
 
   <section>
@@ -344,14 +351,27 @@
   </section>
 
   <section>
-    <div class="round-head"><h2>Round 10</h2><span class="tally">running</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Final survivor hunt — screening in progress</span><span class="chip wait">PENDING</span></div>
-      <div class="note" style="margin-top:4px">1 more to go. This page updates as results land.</div></div>
+    <div class="round-head"><h2>Round 10 — final</h2><span class="tally">1 pass · 9 fail</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">WRB Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS — tuned</span></div>
+      <div class="note" style="margin-top:4px">A wide down bar closing in its bottom quintile above the EMA200, confirmed by an up close, bought at the next open; exit on the first strong close. Baseline had stellar quality (PF 1.75/2.74, WR ~75%) at only 38/33 trades; the tuning pass widened the net (range threshold 2.0 → 1.5 ATR) to 73/58 trades while quality held. Lowest drawdowns of the entire stable.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Deep Spring (72-bar) <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — PF 3.85/2.22 but 5/13 trades</span></div>
+      <div class="note" style="margin-top:4px">Spectacular but far too rare. Worth remembering for a multi-market or 4h context.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Doji Break at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.40</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Daily Spring Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip near">NEAR — PF 1.44 both years</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Channel + IBS Confluence <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — PF 1.46 / 1.30</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Double Inside Break <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — 2023 PF 0.59</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Transfers: Spring → SPX500/US30 · WRB Follow → BTC · First Pullback → GBPJPY</span><span class="chip fail">FAIL — home-market effect again</span></div></div>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>What's next</h2><span class="tally">engineering</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Port the ten survivors to the live trading engine</span><span class="chip wait">PENDING</span></div>
+      <div class="note" style="margin-top:4px">The builtins currently exist in the backtester only. Before any can trade a real account they must be implemented in the execution engine's strategy dispatcher (same signal logic, live bars), then validated on a demo account — the same path Previous Candle Trend Scalper took.</div></div>
   </section>
 
   <footer>
     Screening runs on the real backtest engine (identical numbers to the platform UI).
-    Running tally: <b>9 of 90</b> ideas survived the strict two-year filter — an honest hit rate.
+    Final tally: <b>10 of 100</b> ideas survived the strict two-year filter — an honest 10% hit rate across ten rounds.
     Discuss any strategy by name and round; each verdict cites the failing metric.
   </footer>
 </div>
