@@ -114,7 +114,7 @@
 <div class="wrap">
   <p class="eyebrow">Systematic Mind Academy</p>
   <h1>Strategy Lab</h1>
-  <p class="updated">Updated Jul 11, 2026 · rounds 1–5 complete · round 6 running</p>
+  <p class="updated">Updated Jul 11, 2026 · rounds 1–6 complete · round 7 running</p>
 
   <div class="live">
     <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
@@ -127,7 +127,7 @@
   Dukascopy data · $5,000 · 1% risk · compounding · zero fees/spread</p>
 
   <section>
-    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">7 / 50</span></div>
+    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">8 / 60</span></div>
     <div class="surv">
       <div class="strat">
         <div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
@@ -178,8 +178,15 @@
           <span><span class="yr">2023</span>&nbsp; PF <b>1.62</b> · WR <b>44.9%</b> · DD <b>−6.1%</b> · 78</span>
         </div>
       </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">Spring Reversal <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>1.90</b> · WR <b>48.3%</b> · DD <b>−4.4%</b> · 89</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>43.3%</b> · DD <b>−8.7%</b> · 97</span>
+        </div>
+      </div>
     </div>
-    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all seven hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio.</p>
+    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all eight hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio. <b>Venue concentration:</b> four survivors trade XAUUSD 1h — treat them as one gold exposure bucket when sizing.</p>
   </section>
 
   <section>
@@ -265,14 +272,32 @@
   </section>
 
   <section>
-    <div class="round-head"><h2>Round 6</h2><span class="tally">running</span></div>
+    <div class="round-head"><h2>Round 6</h2><span class="tally">1 pass · 9 fail</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Spring Reversal <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+      <div class="note" style="margin-top:4px">Wyckoff spring: a bar pierces the 20-bar low intrabar but closes back above it in an uptrend — a stop-run reversal. Passed with stock parameters. Anchors on the channel low, not the EMA, so it's mechanically distinct from the pin-bar/engulfing pair.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Gold Dip Buy <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.43 · DD −18.8%</span></div>
+      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.52</b> · 325 trades (stock)</span><span><span class="yr">2023</span>&nbsp; PF 1.43 · DD −18.8% ✗</span>
+      <span><span class="yr">2025</span>&nbsp; PF <b>1.68</b> · 189 trades (3-bar dip)</span><span><span class="yr">2023</span>&nbsp; PF 1.41 · DD −15.5% ✗</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">EMA200 Retest <span class="strat-market">· GBPUSD 1h</span></span><span class="chip near">NEAR — only ~24 trades/yr</span></div>
+      <div class="note" style="margin-top:4px">PF 1.65 in 2025 but the setup is too rare; the frequency-directed tune reached only ~40/yr with PF falling. Removed.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Continuation Pullback <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — PF 1.29 / 1.41</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">RSI-3 Gold Reversion <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF 1.29 / 1.15</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Morning Star at EMA <span class="strat-market">· XAUUSD 1h</span></span><span class="chip fail">FAIL — PF + frequency</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">ATR Stretch Fade <span class="strat-market">· AUDUSD 1h</span></span><span class="chip fail">FAIL — PF 1.07 / 1.24</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Hikkake <span class="strat-market">· EURUSD 1h</span></span><span class="chip fail">FAIL — PF 1.08 / 0.83</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Channel Snapback <span class="strat-market">· DAX40 1h</span></span><span class="chip fail">FAIL — PF &lt; 1 both years</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Trend Resume <span class="strat-market">· GBPUSD 1h</span></span><span class="chip fail">FAIL — 2025 PF 0.61 · DD −21.2%</span></div></div>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>Round 7</h2><span class="tally">running</span></div>
     <div class="strat"><div class="strat-top"><span class="strat-name">Ten new ideas — screening in progress</span><span class="chip wait">PENDING</span></div>
-      <div class="note" style="margin-top:4px">Still need 3 more survivors. Round 6 leans into what passes — discrete-event reversion triggers and pattern continuation on the proven venues — plus fresh mechanisms (springs, hikkake, trend-resume).</div></div>
+      <div class="note" style="margin-top:4px">2 more survivors to go. This page updates as results land.</div></div>
   </section>
 
   <footer>
     Screening runs on the real backtest engine (identical numbers to the platform UI).
-    Running tally: <b>7 of 50</b> ideas survived the strict two-year filter — an honest hit rate.
+    Running tally: <b>8 of 60</b> ideas survived the strict two-year filter — an honest hit rate.
     Discuss any strategy by name and round; each verdict cites the failing metric.
   </footer>
 </div>
