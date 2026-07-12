@@ -114,7 +114,7 @@
 <div class="wrap">
   <p class="eyebrow">Systematic Mind Academy</p>
   <h1>Strategy Lab</h1>
-  <p class="updated">Updated Jul 11, 2026 · rounds 1–8 complete · round 9 running</p>
+  <p class="updated">Updated Jul 11, 2026 · rounds 1–9 complete · round 10 running · 9 of 10 found</p>
 
   <div class="live">
     <div class="live-row"><span class="dot"></span><span class="live-title">Live now</span>
@@ -127,7 +127,7 @@
   Dukascopy data · $5,000 · 1% risk · compounding · zero fees/spread</p>
 
   <section>
-    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">8 / 80</span></div>
+    <div class="round-head"><h2>Survivors — promoted to builtins</h2><span class="tally">9 / 90</span></div>
     <div class="surv">
       <div class="strat">
         <div class="strat-top"><span class="strat-name">IBS Mean Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip pass">PASS</span></div>
@@ -185,8 +185,15 @@
           <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>43.3%</b> · DD <b>−8.7%</b> · 97</span>
         </div>
       </div>
+      <div class="strat">
+        <div class="strat-top"><span class="strat-name">WRB Follow <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+        <div class="metrics">
+          <span><span class="yr">2025</span>&nbsp; PF <b>2.20</b> · WR <b>51.3%</b> · DD <b>−3.9%</b> · 76</span>
+          <span><span class="yr">2023</span>&nbsp; PF <b>1.54</b> · WR <b>43.6%</b> · DD <b>−8.0%</b> · 94</span>
+        </div>
+      </div>
     </div>
-    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all eight hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio. <b>Venue concentration:</b> four survivors trade XAUUSD 1h — treat them as one gold exposure bucket when sizing.</p>
+    <p class="note" style="margin-top:10px">Backtest-only until ported to the live engine. Zero-fee backtests — live results will be lower; all nine hold positions for hours, so spread hurts them far less than scalpers. <b>Correlation caveats:</b> IBS-RSI Confluence ≈ IBS Mean Reversion (same market, same IBS core), and Engulfing at EMA ≈ Pin Bar at EMA (same market, same EMA50-pullback logic) — pick one from each pair per portfolio. <b>Venue concentration:</b> five survivors trade XAUUSD 1h — treat them as one gold exposure bucket when sizing.</p>
   </section>
 
   <section>
@@ -319,14 +326,32 @@
   </section>
 
   <section>
-    <div class="round-head"><h2>Round 9</h2><span class="tally">running</span></div>
-    <div class="strat"><div class="strat-top"><span class="strat-name">Ten new tests — screening in progress</span><span class="chip wait">PENDING</span></div>
-      <div class="note" style="margin-top:4px">2 more to go. The symbol universe turned out to include nine untried markets (WTI, BRENT, FTSE100, USDCHF, USDCAD, NZDUSD, EURJPY, GBPJPY, ETHUSD). Round 9 tests the PROVEN mechanisms on genuinely new markets (labeled as validated configurations) alongside fresh triggers on the home venues.</div></div>
+    <div class="round-head"><h2>Round 9</h2><span class="tally">1 pass · 9 fail</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">WRB Follow <span class="strat-market">· XAUUSD 1h</span></span><span class="chip pass">PASS</span></div>
+      <div class="note" style="margin-top:4px">Momentum follow-through of a 2-ATR wide-range bar closing in its top quintile; SL at the bar midpoint, 2R target. Failed on GBPUSD in round 7 — gold is its home. No EMA/channel anchor, so mechanically distinct from the other gold patterns.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Tweezer Bottom <span class="strat-market">· XAUUSD 1h</span></span><span class="chip near">NEAR — 2023 PF 1.49, missed by 0.01</span></div>
+      <div class="metrics"><span><span class="yr">2025</span>&nbsp; PF <b>1.74</b> · WR 46% · DD −7.9% · 221</span><span><span class="yr">2023</span>&nbsp; PF 1.49 · WR 42% · DD −10.8% · 243</span></div>
+      <div class="note" style="margin-top:4px">The closest fail of the entire lab. One tuning pass allowed and spent — removed per the rules.</div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Spring Reversal → WTI <span class="strat-market">· transfer</span></span><span class="chip fail">FAIL — 2023 PF 2.26 but 2025 PF 1.24</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">IBS Mean Reversion → FTSE100 <span class="strat-market">· transfer</span></span><span class="chip fail">FAIL — PF 1.50 / 1.11</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">First Pullback → USDCHF / EURJPY <span class="strat-market">· transfers</span></span><span class="chip fail">FAIL — one year short each</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Pin Bar at EMA → XAGUSD <span class="strat-market">· transfer</span></span><span class="chip fail">FAIL — PF 1.03 / 1.43</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Velocity Reversion <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — 2025 PF 1.19 + frequency</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Channel Snapback <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — PF 1.41 / 1.29</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Three Down + IBS Exit <span class="strat-market">· SPX500 1h</span></span><span class="chip fail">FAIL — PF 1.19 / 1.22</span></div></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Takeaway</span><span class="chip near">INSIGHT</span></div>
+      <div class="note" style="margin-top:4px">All five market transfers of proven mechanisms failed — each survivor is married to its home market. That is good news for the survivors: they are not generic curve fits.</div></div>
+  </section>
+
+  <section>
+    <div class="round-head"><h2>Round 10</h2><span class="tally">running</span></div>
+    <div class="strat"><div class="strat-top"><span class="strat-name">Final survivor hunt — screening in progress</span><span class="chip wait">PENDING</span></div>
+      <div class="note" style="margin-top:4px">1 more to go. This page updates as results land.</div></div>
   </section>
 
   <footer>
     Screening runs on the real backtest engine (identical numbers to the platform UI).
-    Running tally: <b>8 of 80</b> ideas survived the strict two-year filter — an honest hit rate.
+    Running tally: <b>9 of 90</b> ideas survived the strict two-year filter — an honest hit rate.
     Discuss any strategy by name and round; each verdict cites the failing metric.
   </footer>
 </div>
