@@ -33,9 +33,8 @@
         mode: "0600"
         content: |
           ENGINE_API_KEY={{ orchestrator_api_key }}
-          # Optional push alerts: create a bot with @BotFather and fill these in.
-          TELEGRAM_BOT_TOKEN=
-          TELEGRAM_CHAT_ID=
+          TELEGRAM_BOT_TOKEN={{ telegram_bot_token | default('') }}
+          TELEGRAM_CHAT_ID={{ telegram_chat_id | default('') }}
 
     - name: Install backup script
       ansible.builtin.copy:
