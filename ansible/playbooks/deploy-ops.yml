@@ -1,0 +1,198 @@
+---
+- name: Deploy operational safety net (backups + watchdog) on sma-ubuntu-2
+  hosts: mt5_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    ops_dir: /opt/sma/bin
+    backup_dir: /opt/sma/backups
+    status_file: /opt/sma/lab/status.json
+    retention_days: 30
+
+  tasks:
+    - name: Ensure ops directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ ops_dir }}"
+        - "{{ backup_dir }}"
+        - /opt/sma/lab
+
+    - name: Write backup encryption key
+      ansible.builtin.copy:
+        dest: /opt/sma/backup.key
+        content: "{{ backup_passphrase }}"
+        mode: "0600"
+
+    - name: Write watchdog environment
+      ansible.builtin.copy:
+        dest: /opt/sma/watchdog.env
+        mode: "0600"
+        content: |
+          ENGINE_API_KEY={{ orchestrator_api_key }}
+          # Optional push alerts: create a bot with @BotFather and fill these in.
+          TELEGRAM_BOT_TOKEN=
+          TELEGRAM_CHAT_ID=
+
+    - name: Install backup script
+      ansible.builtin.copy:
+        dest: "{{ ops_dir }}/backup.sh"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          # Nightly encrypted backup: portfolio-lab Postgres + engine state.
+          # Everything else (code, playbooks, strategies) lives in git.
+          set -euo pipefail
+          stamp=$(date -u +%Y%m%d-%H%M%S)
+          dest="{{ backup_dir }}"
+          keyfile=/opt/sma/backup.key
+
+          # 1. Postgres dump (schema + data: users, accounts, portfolios,
+          #    published strategies, deployments metadata).
+          docker exec portfolio-lab-db-1 pg_dump -U postgres sma_portfolio_lab \
+            | gzip \
+            | openssl enc -aes-256-cbc -pbkdf2 -pass file:"$keyfile" \
+            > "$dest/portfolio-lab-db-$stamp.sql.gz.enc"
+
+          # 2. Engine state volume (deployments + strategy code cache).
+          docker run --rm -v sma-engine-data:/data:ro alpine \
+            tar czf - -C / data \
+            | openssl enc -aes-256-cbc -pbkdf2 -pass file:"$keyfile" \
+            > "$dest/sma-engine-data-$stamp.tar.gz.enc"
+
+          # Retention.
+          find "$dest" -name '*.enc' -mtime +{{ retention_days }} -delete
+
+          echo "$(date -u +%FT%TZ) backup ok: $stamp" >> "$dest/backup.log"
+
+    - name: Install watchdog script
+      ansible.builtin.copy:
+        dest: "{{ ops_dir }}/watchdog.sh"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          # Every 5 minutes: verify containers + live deployments, auto-restart
+          # stopped containers, publish status to /lab/status.json, and push
+          # Telegram alerts on state changes (if configured).
+          set -uo pipefail
+          source /opt/sma/watchdog.env
+          alerts=()
+          fixes=()
+
+          required="portfolio-lab-backend-1 portfolio-lab-frontend-1 portfolio-lab-db-1 sma-engine sma-orchestrator"
+          # Every onboarded MT5 terminal container must be running too.
+          terminals=$(docker ps -a | awk 'NR>1 {print $NF}' | grep '^mt5-' || true)
+
+          for c in $required $terminals; do
+            if docker ps -q -f name="^${c}$" -f status=running | grep -q .; then
+              continue
+            fi
+            if docker ps -aq -f name="^${c}$" | grep -q .; then
+              docker start "$c" >/dev/null 2>&1 && fixes+=("restarted $c") || alerts+=("container $c down and restart FAILED")
+            else
+              alerts+=("container $c missing")
+            fi
+          done
+
+          # Live deployments on the engine.
+          dep_summary="{}"
+          for pid in 3 4; do
+            resp=$(curl -sf -m 10 -H "X-API-Key: $ENGINE_API_KEY" "http://127.0.0.1:8100/deployments/$pid/status" || true)
+            if [ -z "$resp" ]; then
+              alerts+=("deployment $pid: engine unreachable or no status")
+              continue
+            fi
+            op=$(echo "$resp" | jq -r '.operation_status // "unknown"')
+            hb=$(echo "$resp" | jq -r '.last_heartbeat_at // empty')
+            dep_summary=$(echo "$dep_summary" | jq --arg pid "$pid" --arg op "$op" --arg hb "$hb" '. + {($pid): {status: $op, heartbeat: $hb}}')
+            if [ "$op" != "running" ]; then
+              alerts+=("deployment $pid status: $op")
+            fi
+            if [ -n "$hb" ]; then
+              hb_age=$(( $(date -u +%s) - $(date -u -d "$hb" +%s 2>/dev/null || date -u +%s) ))
+              if [ "$hb_age" -gt 900 ]; then
+                alerts+=("deployment $pid heartbeat stale (${hb_age}s)")
+              fi
+            fi
+          done
+
+          # Disk.
+          disk_pct=$(df / --output=pcent | tail -1 | tr -dc '0-9')
+          if [ "$disk_pct" -gt 85 ]; then
+            alerts+=("disk at ${disk_pct}%")
+          fi
+
+          # Last backup freshness (< 26h).
+          latest_backup=$(ls -t {{ backup_dir }}/*.enc 2>/dev/null | head -1 || true)
+          if [ -n "$latest_backup" ]; then
+            backup_age=$(( $(date +%s) - $(stat -c %Y "$latest_backup") ))
+            if [ "$backup_age" -gt 93600 ]; then
+              alerts+=("last backup is $((backup_age/3600))h old")
+            fi
+          else
+            alerts+=("no backups found yet")
+          fi
+
+          alerts_text=$(printf '%s\n' "${alerts[@]:-}" | grep -v '^$' || true)
+          fixes_text=$(printf '%s\n' "${fixes[@]:-}" | grep -v '^$' || true)
+          ok=true
+          [ -n "$alerts_text" ] && ok=false
+          jq -n \
+            --arg checked_at "$(date -u +%FT%TZ)" \
+            --argjson ok "$ok" \
+            --arg alerts "$alerts_text" \
+            --arg fixes "$fixes_text" \
+            --argjson deployments "$dep_summary" \
+            --arg disk "${disk_pct}%" \
+            '{checked_at: $checked_at, ok: $ok,
+              alerts: ($alerts | split("\n") | map(select(. != ""))),
+              auto_fixes: ($fixes | split("\n") | map(select(. != ""))),
+              deployments: $deployments, disk: $disk}' \
+            > {{ status_file }}.tmp && mv {{ status_file }}.tmp {{ status_file }}
+
+          # Telegram push on state change only.
+          state_hash=$(printf '%s' "${alerts[*]:-ok}" | md5sum | cut -d' ' -f1)
+          last_hash=$(cat /opt/sma/.watchdog_state 2>/dev/null || true)
+          if [ "$state_hash" != "$last_hash" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+            if [ -n "$alerts_text" ]; then
+              msg="SMA watchdog ALERT: ${alerts[*]}"
+            else
+              msg="SMA watchdog: all clear again."
+            fi
+            curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
+          fi
+          echo "$state_hash" > /opt/sma/.watchdog_state
+
+    - name: Schedule nightly backup
+      ansible.builtin.cron:
+        name: sma-backup
+        minute: "15"
+        hour: "3"
+        job: "{{ ops_dir }}/backup.sh >> {{ backup_dir }}/backup.log 2>&1"
+
+    - name: Schedule watchdog every 5 minutes
+      ansible.builtin.cron:
+        name: sma-watchdog
+        minute: "*/5"
+        job: "{{ ops_dir }}/watchdog.sh >/dev/null 2>&1"
+
+    - name: Run an immediate backup
+      ansible.builtin.command: "{{ ops_dir }}/backup.sh"
+      changed_when: true
+
+    - name: Run the watchdog once now
+      ansible.builtin.command: "{{ ops_dir }}/watchdog.sh"
+      changed_when: true
+
+    - name: Show status
+      ansible.builtin.command: cat {{ status_file }}
+      register: watchdog_status
+      changed_when: false
+
+    - name: Print watchdog status
+      ansible.builtin.debug:
+        msg: "{{ watchdog_status.stdout }}"
