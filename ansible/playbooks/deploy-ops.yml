@@ -138,6 +138,7 @@
             dep_summary=$(echo "$dep_summary" | jq --arg pid "$pid" --arg op "$op" --arg hb "$hb" '. + {($pid): {status: $op, heartbeat: $hb}}')
             if [ "$op" != "running" ]; then
               alerts+=("deployment $pid status: $op")
+              dep_error_seen=1
             fi
             if [ -n "$hb" ]; then
               hb_age=$(( $(date -u +%s) - $(date -u -d "$hb" +%s 2>/dev/null || date -u +%s) ))
@@ -146,6 +147,26 @@
               fi
             fi
           done
+
+          # Auto-heal: a deployment stuck in error usually means a dead
+          # worker thread; an engine restart resumes every deployment from
+          # its snapshot (risk state persists on disk). Act only on the
+          # second consecutive sighting and at most once per 30 minutes.
+          if [ "${dep_error_seen:-0}" = "1" ]; then
+            if [ -f /opt/sma/.watchdog_dep_error ]; then
+              last_restart=$(cat /opt/sma/.watchdog_engine_restart 2>/dev/null || echo 0)
+              now_ts=$(date -u +%s)
+              if [ $(( now_ts - last_restart )) -gt 1800 ]; then
+                docker restart sma-engine >/dev/null 2>&1                   && fixes+=("restarted sma-engine to recover an errored deployment")                   || alerts+=("engine auto-restart FAILED")
+                echo "$now_ts" > /opt/sma/.watchdog_engine_restart
+                rm -f /opt/sma/.watchdog_dep_error
+              fi
+            else
+              touch /opt/sma/.watchdog_dep_error
+            fi
+          else
+            rm -f /opt/sma/.watchdog_dep_error
+          fi
 
           # Disk.
           disk_pct=$(df / --output=pcent | tail -1 | tr -dc '0-9')
