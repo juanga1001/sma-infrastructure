@@ -237,6 +237,52 @@
         hour: "3"
         job: "{{ ops_dir }}/parity.sh >/dev/null 2>&1"
 
+    - name: Install weekly comparison (runs inside the backend container)
+      ansible.builtin.copy:
+        src: ../files/weekly_report.py
+        dest: "{{ ops_dir }}/weekly_report.py"
+        mode: "0644"
+
+    - name: Install weekly comparison runner
+      ansible.builtin.copy:
+        dest: "{{ ops_dir }}/weekly.sh"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          # Weekly live-vs-backtest P&L comparison. Backtests the trading
+          # week per deployed leg and diffs against actual results; always
+          # sends a Telegram summary.
+          set -u
+          . /opt/sma/watchdog.env
+          out=/tmp/weekly.json
+          if docker exec -i portfolio-lab-backend-1 python - < {{ ops_dir }}/weekly_report.py > "$out" 2>/tmp/weekly.err; then
+            mv "$out" /opt/sma/lab/weekly-report.json
+            summary=$(jq -r '.deployments | to_entries[] | "\(.value.portfolio | .[0:34]): live \(.value.live_pnl) vs sim \(.value.sim_pnl) (d \(.value.pnl_delta))"' /opt/sma/lab/weekly-report.json)
+            issues=$(jq -r '.alerts[]?' /opt/sma/lab/weekly-report.json | head -6)
+            msg="SMA weekly live-vs-backtest: $summary"
+            if [ -n "$issues" ]; then
+              msg="$msg -- FLAGS: $issues"
+            fi
+            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
+            fi
+          else
+            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+              msg="SMA weekly comparison FAILED to run: $(tail -c 300 /tmp/weekly.err)"
+              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
+            fi
+          fi
+
+    - name: Schedule weekly comparison (Saturday morning)
+      ansible.builtin.cron:
+        name: sma-weekly-report
+        minute: "0"
+        hour: "8"
+        weekday: "6"
+        job: "{{ ops_dir }}/weekly.sh >/dev/null 2>&1"
+
     - name: Schedule nightly backup
       ansible.builtin.cron:
         name: sma-backup
