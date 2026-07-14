@@ -82,6 +82,29 @@
           fixes=()
 
           required="portfolio-lab-backend-1 portfolio-lab-frontend-1 portfolio-lab-db-1 sma-engine sma-orchestrator"
+
+          # Orphaned MT5 terminals: account deletion tears the container down
+          # best-effort, so a missed teardown leaves a terminal running with
+          # no owning account. Remove those (and their config volumes) before
+          # the restart loop below can resurrect them. Strict UUID matching
+          # protects mt5-golden and friends; a failed accounts query skips
+          # the cleanup entirely rather than treating everything as orphaned.
+          uuid_re='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+          if account_ids=$(docker exec portfolio-lab-db-1 psql -U postgres -d sma_portfolio_lab -t -A -c 'SELECT id FROM account;' 2>/dev/null); then
+            for c in $(docker ps -a | awk 'NR>1 {print $NF}' | grep -E "^mt5-${uuid_re}$" || true); do
+              cid=${c#mt5-}
+              if ! printf '%s\n' "$account_ids" | grep -qix "$cid"; then
+                docker rm -f "$c" >/dev/null 2>&1 && fixes+=("removed orphan terminal $c") || alerts+=("orphan terminal $c could not be removed")
+              fi
+            done
+            for v in $(docker volume ls -q | grep -E "^mt5-${uuid_re}-config$" || true); do
+              vid=${v#mt5-}; vid=${vid%-config}
+              if ! printf '%s\n' "$account_ids" | grep -qix "$vid"; then
+                docker volume rm "$v" >/dev/null 2>&1 && fixes+=("removed orphan terminal volume $v") || alerts+=("orphan terminal volume $v could not be removed")
+              fi
+            done
+          fi
+
           # Every onboarded MT5 terminal container must be running too.
           terminals=$(docker ps -a | awk 'NR>1 {print $NF}' | grep '^mt5-' || true)
 
