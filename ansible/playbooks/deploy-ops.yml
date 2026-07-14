@@ -191,7 +191,7 @@
           set -u
           . /opt/sma/watchdog.env
           out=/tmp/parity.json
-          if docker exec -i portfolio-lab-backend-1 python - < /opt/sma/parity_check.py > "$out" 2>/tmp/parity.err; then
+          if docker exec -i portfolio-lab-backend-1 python - < {{ ops_dir }}/parity_check.py > "$out" 2>/tmp/parity.err; then
             mv "$out" /opt/sma/lab/parity.json
             alerts=$(jq -r '.alerts[]?' /opt/sma/lab/parity.json)
             if [ -n "$alerts" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
