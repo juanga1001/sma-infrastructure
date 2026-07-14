@@ -21,6 +21,58 @@
         - "{{ backup_dir }}"
         - /opt/sma/lab
 
+    - name: Create swapfile (OOM insurance for Wine terminal spikes)
+      ansible.builtin.shell: |
+        fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile
+      args:
+        creates: /swapfile
+
+    - name: Enable swap now
+      ansible.builtin.shell: |
+        swapon --show --noheadings | grep -q "^/swapfile" || swapon /swapfile
+      changed_when: false
+
+    - name: Persist swap across reboots
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+
+    - name: Prefer RAM over swap (server workload)
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-sma-swappiness.conf
+        content: "vm.swappiness=10\n"
+        mode: "0644"
+
+    - name: Apply swappiness now
+      ansible.builtin.command: sysctl -w vm.swappiness=10
+      changed_when: false
+
+    - name: Default Docker log rotation for future containers
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        mode: "0644"
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {"max-size": "20m", "max-file": "3"},
+            "live-restore": true
+          }
+
+    - name: Rotate existing container logs (covers long-lived terminals)
+      ansible.builtin.copy:
+        dest: /etc/logrotate.d/docker-containers
+        mode: "0644"
+        content: |
+          /var/lib/docker/containers/*/*-json.log {
+            daily
+            rotate 3
+            maxsize 100M
+            missingok
+            copytruncate
+            compress
+            delaycompress
+          }
+
     - name: Write backup encryption key
       ansible.builtin.copy:
         dest: /opt/sma/backup.key
@@ -168,6 +220,13 @@
             rm -f /opt/sma/.watchdog_dep_error
           fi
 
+          # Memory: Wine terminals spike; with swap as the buffer, alert
+          # while there is still time to act.
+          mem_avail=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+          if [ "$mem_avail" -lt 400 ]; then
+            alerts+=("low memory: ${mem_avail}MB available")
+          fi
+
           # Disk.
           disk_pct=$(df / --output=pcent | tail -1 | tr -dc '0-9')
           if [ "$disk_pct" -gt 85 ]; then
@@ -196,10 +255,11 @@
             --arg fixes "$fixes_text" \
             --argjson deployments "$dep_summary" \
             --arg disk "${disk_pct}%" \
+            --arg mem "${mem_avail}MB" \
             '{checked_at: $checked_at, ok: $ok,
               alerts: ($alerts | split("\n") | map(select(. != ""))),
               auto_fixes: ($fixes | split("\n") | map(select(. != ""))),
-              deployments: $deployments, disk: $disk}' \
+              deployments: $deployments, disk: $disk, mem_available: $mem}' \
             > {{ status_file }}.tmp && mv {{ status_file }}.tmp {{ status_file }}
 
           # Telegram push on state change only.
