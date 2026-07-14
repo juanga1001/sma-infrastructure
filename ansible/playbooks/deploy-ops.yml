@@ -96,9 +96,15 @@
             fi
           done
 
-          # Live deployments on the engine.
+          # Live deployments on the engine, discovered from the snapshot
+          # files: new deployments are watched automatically and undeployed
+          # portfolios drop out on their own.
           dep_summary="{}"
-          for pid in 3 4; do
+          pids=$(docker exec sma-engine ls /app/data/deployments 2>/dev/null | sed -n 's/^portfolio_\([0-9][0-9]*\)\.json$/\1/p')
+          if [ -z "$pids" ]; then
+            alerts+=("engine: no deployment snapshots found")
+          fi
+          for pid in $pids; do
             resp=$(curl -sf -m 10 -H "X-API-Key: $ENGINE_API_KEY" "http://127.0.0.1:8100/deployments/$pid/status" || true)
             if [ -z "$resp" ]; then
               alerts+=("deployment $pid: engine unreachable or no status")
