@@ -152,15 +152,17 @@ def main() -> None:
                 late_slack = max(MATCH_LATE_SLACK_MIN, tf_seconds // 2)
                 unmatched_live = list(live_entries)
                 matched = 0
+                # Strategies mark the entry on the bar where execution
+                # happens, so a live fill prints seconds after that bar's
+                # OPEN (the engine fires when the previous bar closes).
                 for bar_open, direction in sorted(signals):
-                    bar_close = bar_open + tf_seconds
                     hit = None
                     for deal in unmatched_live:
                         deal_epoch = datetime.fromisoformat(deal["time"]).timestamp()
                         if deal["side"] == direction and (
-                            bar_close - MATCH_EARLY_SLACK
+                            bar_open - MATCH_EARLY_SLACK
                             <= deal_epoch
-                            <= bar_close + late_slack
+                            <= bar_open + late_slack
                         ):
                             hit = deal
                             break
