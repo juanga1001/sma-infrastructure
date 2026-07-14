@@ -172,6 +172,48 @@
           fi
           echo "$state_hash" > /opt/sma/.watchdog_state
 
+    - name: Install parity check (runs inside the backend container)
+      ansible.builtin.copy:
+        src: ../files/parity_check.py
+        dest: "{{ ops_dir }}/parity_check.py"
+        mode: "0644"
+
+    - name: Install parity runner
+      ansible.builtin.copy:
+        dest: "{{ ops_dir }}/parity.sh"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          # Nightly live-vs-backtest parity monitor. Replays recent broker
+          # bars through each deployed leg's signal code and diffs against
+          # actual fills; alerts via Telegram when live entries have no
+          # matching backtest signal.
+          set -u
+          . /opt/sma/watchdog.env
+          out=/tmp/parity.json
+          if docker exec -i portfolio-lab-backend-1 python - < /opt/sma/parity_check.py > "$out" 2>/tmp/parity.err; then
+            mv "$out" /opt/sma/lab/parity.json
+            alerts=$(jq -r '.alerts[]?' /opt/sma/lab/parity.json)
+            if [ -n "$alerts" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+              msg="SMA parity monitor ALERT: $alerts"
+              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
+            fi
+          else
+            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+              msg="SMA parity monitor FAILED to run: $(tail -c 300 /tmp/parity.err)"
+              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
+            fi
+          fi
+
+    - name: Schedule nightly parity check
+      ansible.builtin.cron:
+        name: sma-parity
+        minute: "50"
+        hour: "3"
+        job: "{{ ops_dir }}/parity.sh >/dev/null 2>&1"
+
     - name: Schedule nightly backup
       ansible.builtin.cron:
         name: sma-backup
