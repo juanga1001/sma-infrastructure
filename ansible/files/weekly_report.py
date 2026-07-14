@@ -30,6 +30,7 @@ from app.portfolio.deployment import get_execution_node_client
 from app.portfolio.strategy_source import prepare_strategy_source_for_execution_node
 
 PNL_GAP_ALERT_USD = 100.0  # per-leg live-vs-sim gap worth flagging
+WARMUP_DAYS = 45  # indicators (EMA200 on 1h, Donchian) need formed history
 
 
 def week_start(now: datetime) -> datetime:
@@ -121,10 +122,16 @@ def main() -> None:
                 }
                 try:
                     code = resolve_code(session, instance.strategy_key)
+                    # Warm-up: indicators need history before the week, so
+                    # the sim starts earlier (fixed-balance sizing keeps the
+                    # week's P&L comparable) and the week's result is read
+                    # off the equity curve from the week boundary.
                     result = run_backtest(
                         strategy_name=instance.strategy_key,
                         symbol=instance.symbol,
-                        start_date=start.date().isoformat(),
+                        start_date=(start - timedelta(days=WARMUP_DAYS))
+                        .date()
+                        .isoformat(),
                         end_date=(now + timedelta(days=1)).date().isoformat(),
                         timeframe=instance.timeframe,
                         initial_balance=week_start_balance or 10_000,
@@ -133,12 +140,23 @@ def main() -> None:
                         max_equity_curve_points=None,
                         strategy_code=code,
                         use_broker_data=True,
+                        use_current_balance=False,
                     )
                     metrics = result["metrics"]
-                    sim_pnl = float(metrics.get("final_equity") or 0.0) - (
-                        week_start_balance or 10_000
+                    curve = result.get("equity_curve") or []
+                    week_boundary_equity = None
+                    for point in curve:
+                        stamp = str(point.get("date") or "")[:19]
+                        if stamp and stamp < start.strftime("%Y-%m-%dT%H:%M:%S"):
+                            week_boundary_equity = float(point["equity"])
+                        else:
+                            break
+                    if week_boundary_equity is None:
+                        week_boundary_equity = week_start_balance or 10_000
+                    sim_pnl = (
+                        float(metrics.get("final_equity") or 0.0)
+                        - week_boundary_equity
                     )
-                    sim_trades = int(metrics.get("total_trades") or 0)
                 except Exception as error:  # noqa: BLE001
                     leg["error"] = str(error)[:160]
                     alerts.append(
@@ -151,14 +169,13 @@ def main() -> None:
                 delta = live_pnl - sim_pnl
                 leg.update(
                     {
-                        "sim_trades": sim_trades,
                         "sim_pnl": round(sim_pnl, 2),
                         "pnl_delta": round(delta, 2),
                     }
                 )
                 sim_total += sim_pnl
                 live_total += live_pnl
-                if (live_trades or sim_trades) and (
+                if (live_trades or abs(sim_pnl) > 0.01) and (
                     abs(delta) >= PNL_GAP_ALERT_USD
                     or (live_pnl < 0 < sim_pnl)
                     or (sim_pnl < 0 < live_pnl)
