@@ -85,10 +85,22 @@ def main() -> None:
                 )
                 deals_payload = client.get_deployment_deals(
                     execution_portfolio_id=pid, since=start.isoformat()
-                )
+                )  # engine clamps to the deployment start itself
             except Exception as error:  # noqa: BLE001
                 alerts.append(f"deployment {pid}: live data fetch failed: {error}")
                 continue
+
+            # Live attribution only exists from the deployment's creation
+            # (redeploys reset it), so the sim must compare over the same
+            # window or a mid-week redeploy makes sim cover more days than
+            # live ever could.
+            boundary = start
+            deployed_at_raw = live.get("deployed_at")
+            if deployed_at_raw:
+                deployed_at = datetime.fromisoformat(deployed_at_raw)
+                if deployed_at.tzinfo is None:
+                    deployed_at = deployed_at.replace(tzinfo=timezone.utc)
+                boundary = max(start, deployed_at)
 
             week_start_balance = float(live.get("start_balance") or 0.0)
             live_rows = {
@@ -145,9 +157,10 @@ def main() -> None:
                     metrics = result["metrics"]
                     curve = result.get("equity_curve") or []
                     week_boundary_equity = None
+                    boundary_stamp = boundary.strftime("%Y-%m-%dT%H:%M:%S")
                     for point in curve:
                         stamp = str(point.get("date") or "")[:19]
-                        if stamp and stamp < start.strftime("%Y-%m-%dT%H:%M:%S"):
+                        if stamp and stamp < boundary_stamp:
                             week_boundary_equity = float(point["equity"])
                         else:
                             break
@@ -190,6 +203,7 @@ def main() -> None:
 
             report["deployments"][str(pid)] = {
                 "portfolio": portfolio.name,
+                "compare_since": boundary.isoformat(),
                 "week_start_balance": round(week_start_balance, 2),
                 "live_pnl": round(live_total, 2),
                 "sim_pnl": round(sim_total, 2),
