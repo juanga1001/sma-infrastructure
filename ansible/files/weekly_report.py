@@ -106,14 +106,21 @@ def main() -> None:
             live_rows = {
                 row["instance_id"]: row for row in live.get("strategies", [])
             }
-            # Entry fill prices per instance for the slippage stats.
-            entry_prices: dict[str, list[float]] = {}
+            # POSITION-level live counts: broker deal counts double partial
+            # fills/closes, so group closing deals by position id. Falls back
+            # to the engine's deal count when position ids are unavailable.
+            live_positions: dict[str, set] = {}
             for deal in deals_payload.get("deals", []):
-                if deal.get("entry") == "in" and deal.get("instance_id"):
-                    if deal.get("price") is not None:
-                        entry_prices.setdefault(deal["instance_id"], []).append(
-                            float(deal["price"])
-                        )
+                instance_id = deal.get("instance_id")
+                if not instance_id or deal.get("entry") != "out":
+                    continue
+                position_ref = (
+                    deal.get("position_id")
+                    or deal.get("position")
+                    or deal.get("ticket")
+                )
+                if position_ref is not None:
+                    live_positions.setdefault(instance_id, set()).add(position_ref)
 
             legs_out = []
             sim_total = 0.0
@@ -123,27 +130,31 @@ def main() -> None:
                     continue
                 live_row = live_rows.get(str(instance.id), {})
                 live_pnl = float(live_row.get("closed_pnl_total") or 0.0)
-                live_trades = int(live_row.get("trades_total") or 0)
+                live_deals = int(live_row.get("trades_total") or 0)
+                position_refs = live_positions.get(str(instance.id))
+                live_pos = len(position_refs) if position_refs else live_deals
                 leg = {
                     "strategy": live_row.get("strategy") or instance.strategy_key,
                     "symbol": instance.symbol,
                     "timeframe": instance.timeframe,
                     "risk_pct": instance.risk_per_trade_pct,
-                    "live_trades": live_trades,
+                    # deals = broker closing deals (partials inflate);
+                    # positions = distinct closed positions (compare THESE
+                    # with sim_trades).
+                    "live_deals": live_deals,
+                    "live_positions": live_pos,
                     "live_pnl": round(live_pnl, 2),
                 }
                 try:
                     code = resolve_code(session, instance.strategy_key)
-                    # Warm-up: indicators need history before the week, so
-                    # the sim starts earlier (fixed-balance sizing keeps the
-                    # week's P&L comparable) and the week's result is read
-                    # off the equity curve from the week boundary.
+                    # auto_warmup pre-forms indicators before the boundary and
+                    # suppresses entries until it, so metrics cover ONLY the
+                    # compared window — total_trades is directly comparable
+                    # with live_positions (day granularity on the boundary).
                     result = run_backtest(
                         strategy_name=instance.strategy_key,
                         symbol=instance.symbol,
-                        start_date=(start - timedelta(days=WARMUP_DAYS))
-                        .date()
-                        .isoformat(),
+                        start_date=boundary.date().isoformat(),
                         end_date=(now + timedelta(days=1)).date().isoformat(),
                         timeframe=instance.timeframe,
                         initial_balance=week_start_balance or 10_000,
@@ -153,23 +164,13 @@ def main() -> None:
                         strategy_code=code,
                         use_broker_data=True,
                         use_current_balance=False,
+                        auto_warmup_days=WARMUP_DAYS,
                     )
                     metrics = result["metrics"]
-                    curve = result.get("equity_curve") or []
-                    week_boundary_equity = None
-                    boundary_stamp = boundary.strftime("%Y-%m-%dT%H:%M:%S")
-                    for point in curve:
-                        stamp = str(point.get("date") or "")[:19]
-                        if stamp and stamp < boundary_stamp:
-                            week_boundary_equity = float(point["equity"])
-                        else:
-                            break
-                    if week_boundary_equity is None:
-                        week_boundary_equity = week_start_balance or 10_000
-                    sim_pnl = (
-                        float(metrics.get("final_equity") or 0.0)
-                        - week_boundary_equity
+                    sim_pnl = float(metrics.get("final_equity") or 0.0) - (
+                        week_start_balance or 10_000
                     )
+                    sim_trades = int(metrics.get("total_trades") or 0)
                 except Exception as error:  # noqa: BLE001
                     leg["error"] = str(error)[:160]
                     alerts.append(
@@ -182,13 +183,14 @@ def main() -> None:
                 delta = live_pnl - sim_pnl
                 leg.update(
                     {
+                        "sim_trades": sim_trades,
                         "sim_pnl": round(sim_pnl, 2),
                         "pnl_delta": round(delta, 2),
                     }
                 )
                 sim_total += sim_pnl
                 live_total += live_pnl
-                if (live_trades or abs(sim_pnl) > 0.01) and (
+                if (live_pos or abs(sim_pnl) > 0.01) and (
                     abs(delta) >= PNL_GAP_ALERT_USD
                     or (live_pnl < 0 < sim_pnl)
                     or (sim_pnl < 0 < live_pnl)
@@ -199,12 +201,24 @@ def main() -> None:
                         f"{instance.timeframe}: live {live_pnl:+.2f} vs sim "
                         f"{sim_pnl:+.2f} (delta {delta:+.2f})"
                     )
+                count_gap = abs(live_pos - sim_trades)
+                if count_gap >= 3 and count_gap >= 0.5 * max(live_pos, sim_trades):
+                    alerts.append(
+                        f"deployment {pid} "
+                        f"{leg['strategy'][:24]} {instance.symbol} "
+                        f"{instance.timeframe}: trade-count mismatch — live "
+                        f"{live_pos} positions vs sim {sim_trades} trades"
+                    )
                 legs_out.append(leg)
 
             report["deployments"][str(pid)] = {
                 "portfolio": portfolio.name,
                 "compare_since": boundary.isoformat(),
                 "week_start_balance": round(week_start_balance, 2),
+                "live_positions": sum(
+                    leg.get("live_positions", 0) for leg in legs_out
+                ),
+                "sim_trades": sum(leg.get("sim_trades", 0) for leg in legs_out),
                 "live_pnl": round(live_total, 2),
                 "sim_pnl": round(sim_total, 2),
                 "pnl_delta": round(live_total - sim_total, 2),
