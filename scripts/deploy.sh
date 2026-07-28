@@ -38,9 +38,13 @@ replace_tree() { # $1 container  $2 local_dir  $3 remote_parent  $4 tree_name
 }
 
 deploy_backend() {
-  echo "== backend: clean replace app/ + tests/, restart"
+  echo "== backend: clean replace app/ + tests/ + scripts/, restart"
   replace_tree portfolio-lab-backend-1 "$LAB/backend" /app/backend app
   replace_tree portfolio-lab-backend-1 "$LAB/backend" /app/backend tests
+  # scripts/ holds the operational tooling (publish, redeploy, composition
+  # sync, macro refresh); leaving it out stranded new scripts on the
+  # workstation and made every run a manual docker cp.
+  replace_tree portfolio-lab-backend-1 "$LAB/backend" /app/backend scripts
   "${SSH[@]}" "docker restart portfolio-lab-backend-1 >/dev/null"
   "${SSH[@]}" "sleep 5; docker ps --filter name=portfolio-lab-backend-1 --format 'backend {{.Status}}'"
 }
