@@ -21,7 +21,12 @@ replace_tree() { # $1 container  $2 local_dir  $3 remote_parent  $4 tree_name
   local container="$1" local_dir="$2" parent="$3" tree="$4"
   local tarball
   tarball="$(mktemp /tmp/deploy-XXXX.tgz)"
-  tar -C "$local_dir" -czf "$tarball" "$tree"
+  # COPYFILE_DISABLE + the ._* exclusion keep macOS AppleDouble resource
+  # forks out of the tree. One of them (._b7f1a2c3d4e5_*.py) landed in
+  # alembic/versions and broke every migration command with "source code
+  # string cannot contain null bytes" until 2026-07-27.
+  COPYFILE_DISABLE=1 tar -C "$local_dir" --exclude='._*' --exclude='.DS_Store' \
+    --exclude='__pycache__' -czf "$tarball" "$tree"
   scp -q -i "$KEY" "$tarball" "$HOST:/tmp/deploy-tree.tgz"
   rm -f "$tarball"
   "${SSH[@]}" "docker cp /tmp/deploy-tree.tgz $container:/tmp/deploy-tree.tgz && \
