@@ -69,6 +69,18 @@
           DOCKER_HOST: tcp://sma-docker-proxy:2375
           SMA_ENGINE_API_KEY: "{{ engine_api_key }}"
 
+    # Tenant isolation (Phase 1): terminals live on sma-acct-<uuid>
+    # networks. A recreated control-plane container must be re-attached to
+    # every one of them or it cannot reach any terminal.
+    - name: Attach to every per-account terminal network
+      ansible.builtin.shell: |
+        set -e
+        for n in $(docker network ls --format '{{.Name}}' | grep '^sma-acct-' || true); do
+          docker network inspect "$n" --format '{{range .Containers}}{{.Name}} {{end}}' | grep -qw "{{ engine_container }}" \
+            || docker network connect "$n" "{{ engine_container }}"
+        done
+      changed_when: false
+
     - name: Wait for engine health
       ansible.builtin.uri:
         url: "http://127.0.0.1:{{ engine_port }}/health"

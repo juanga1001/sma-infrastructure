@@ -82,6 +82,18 @@
           SMA_MT5_NETWORK: "{{ mt5_network }}"
           SMA_PUBLIC_BASE_URL: "{{ orchestrator_public_base_url }}"
 
+    # Tenant isolation (Phase 1): terminals live on sma-acct-<uuid>
+    # networks. A recreated control-plane container must be re-attached to
+    # every one of them or it cannot reach any terminal.
+    - name: Attach to every per-account terminal network
+      ansible.builtin.shell: |
+        set -e
+        for n in $(docker network ls --format '{{.Name}}' | grep '^sma-acct-' || true); do
+          docker network inspect "$n" --format '{{range .Containers}}{{.Name}} {{end}}' | grep -qw "{{ orchestrator_container }}" \
+            || docker network connect "$n" "{{ orchestrator_container }}"
+        done
+      changed_when: false
+
     - name: Wait for orchestrator health
       ansible.builtin.uri:
         url: "http://localhost:{{ orchestrator_port }}/api/health"
