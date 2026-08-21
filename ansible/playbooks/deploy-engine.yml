@@ -16,10 +16,10 @@
     - name: Verify engine secrets are configured
       ansible.builtin.assert:
         that:
-          - orchestrator_api_key is defined
-          - orchestrator_api_key | length >= 32
+          - engine_api_key is defined
+          - engine_api_key | length >= 32
         fail_msg: >-
-          orchestrator_api_key is missing. Configure vault/mt5-node.yml and
+          engine_api_key is missing. Configure vault/mt5-node.yml and
           pass it with -e @vault/mt5-node.yml.
         quiet: true
 
@@ -66,7 +66,7 @@
           - "/var/run/docker.sock:/var/run/docker.sock"
           - "sma-engine-data:/app/data"
         env:
-          SMA_ENGINE_API_KEY: "{{ orchestrator_api_key }}"
+          SMA_ENGINE_API_KEY: "{{ engine_api_key }}"
 
     - name: Wait for engine health
       ansible.builtin.uri:

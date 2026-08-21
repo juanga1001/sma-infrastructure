@@ -9,3 +9,13 @@ orchestrator_api_key: CHANGE_ME
 # Secret used to sign short-lived VNC access tokens. Must match whatever mints
 # tokens (the orchestrator) and, if a separate gateway is added, that gateway.
 vnc_token_secret: CHANGE_ME
+engine_api_key: "<64 hex chars — engine API key, distinct from the orchestrator key>"
+portfolio_lab_postgres_password: "<postgres password>"
+portfolio_lab_secret_key: "<app SECRET_KEY>"
+portfolio_lab_superuser: "<admin email>"
+portfolio_lab_superuser_password: "<strong random password>"
+git_username: "<github user>"
+git_token: "<github PAT, rotate on exposure>"
+backup_age_public_key: "<age1... public key; private half stays on the operator workstation>"
+telegram_bot_token: "<bot token>"
+telegram_chat_id: "<chat id>"

@@ -53,7 +53,7 @@
           POSTGRES_PASSWORD={{ portfolio_lab_postgres_password }}
           SENTRY_DSN=
           EXECUTION_NODE_URL=http://sma-engine:8100
-          EXECUTION_NODE_API_KEY={{ orchestrator_api_key }}
+          EXECUTION_NODE_API_KEY={{ engine_api_key }}
           ORCHESTRATOR_URL=http://sma-orchestrator:8000
           ORCHESTRATOR_API_KEY={{ orchestrator_api_key }}
 

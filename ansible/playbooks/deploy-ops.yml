@@ -73,243 +73,63 @@
             delaycompress
           }
 
-    - name: Write backup encryption key
+    # Backups are encrypted to an age PUBLIC key; the private half lives
+    # only on the operator workstation (~/.sma/backup-age.key). The old
+    # openssl passphrase sat next to the ciphertext on this host.
+    - name: Write backup age recipients (public key only)
       ansible.builtin.copy:
-        dest: /opt/sma/backup.key
-        content: "{{ backup_passphrase }}"
-        mode: "0600"
+        dest: /opt/sma/backup-age.pub
+        content: "{{ backup_age_public_key }}"
+        mode: "0644"
+
+    - name: Ensure private ops output directory (never web-served)
+      ansible.builtin.file:
+        path: /opt/sma/ops
+        state: directory
+        mode: "0750"
+
+    - name: Install age + rclone for encrypted off-host backups
+      ansible.builtin.apt:
+        name: [age, rclone, jq]
+        state: present
+        update_cache: true
 
     - name: Write watchdog environment
       ansible.builtin.copy:
         dest: /opt/sma/watchdog.env
         mode: "0600"
         content: |
-          ENGINE_API_KEY={{ orchestrator_api_key }}
+          ENGINE_API_KEY={{ engine_api_key }}
           TELEGRAM_BOT_TOKEN={{ telegram_bot_token | default('') }}
           TELEGRAM_CHAT_ID={{ telegram_chat_id | default('') }}
 
-    - name: Install backup script
+    # Every ops script below is copied from the sma-portfolio-lab repo —
+    # the SINGLE source. Inline heredocs here drifted behind the repo and a
+    # routine re-run would have silently removed two incident-driven
+    # watchdog checks (audit 2026-08-21).
+    - name: Install backup script (from sma-portfolio-lab)
       ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/backup.sh"
         dest: "{{ ops_dir }}/backup.sh"
         mode: "0755"
-        content: |
-          #!/usr/bin/env bash
-          # Nightly encrypted backup: portfolio-lab Postgres + engine state.
-          # Everything else (code, playbooks, strategies) lives in git.
-          set -euo pipefail
-          stamp=$(date -u +%Y%m%d-%H%M%S)
-          dest="{{ backup_dir }}"
-          keyfile=/opt/sma/backup.key
 
-          # 1. Postgres dump (schema + data: users, accounts, portfolios,
-          #    published strategies, deployments metadata).
-          docker exec portfolio-lab-db-1 pg_dump -U postgres sma_portfolio_lab \
-            | gzip \
-            | openssl enc -aes-256-cbc -pbkdf2 -pass file:"$keyfile" \
-            > "$dest/portfolio-lab-db-$stamp.sql.gz.enc"
-
-          # 2. Engine state volume (deployments + strategy code cache).
-          docker run --rm -v sma-engine-data:/data:ro alpine \
-            tar czf - -C / data \
-            | openssl enc -aes-256-cbc -pbkdf2 -pass file:"$keyfile" \
-            > "$dest/sma-engine-data-$stamp.tar.gz.enc"
-
-          # Retention.
-          find "$dest" -name '*.enc' -mtime +{{ retention_days }} -delete
-
-          echo "$(date -u +%FT%TZ) backup ok: $stamp" >> "$dest/backup.log"
-
-    - name: Install watchdog script
+    - name: Install watchdog script (from sma-portfolio-lab)
       ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/watchdog.sh"
         dest: "{{ ops_dir }}/watchdog.sh"
         mode: "0755"
-        content: |
-          #!/usr/bin/env bash
-          # Every 5 minutes: verify containers + live deployments, auto-restart
-          # stopped containers, publish status to /lab/status.json, and push
-          # Telegram alerts on state changes (if configured).
-          set -uo pipefail
-          source /opt/sma/watchdog.env
-          alerts=()
-          fixes=()
 
-          required="portfolio-lab-backend-1 portfolio-lab-frontend-1 portfolio-lab-db-1 sma-engine sma-orchestrator"
-
-          # Orphaned MT5 terminals: account deletion tears the container down
-          # best-effort, so a missed teardown leaves a terminal running with
-          # no owning account. Remove those (and their config volumes) before
-          # the restart loop below can resurrect them. Strict UUID matching
-          # protects mt5-golden and friends; a failed accounts query skips
-          # the cleanup entirely rather than treating everything as orphaned.
-          uuid_re='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-          if account_ids=$(docker exec portfolio-lab-db-1 psql -U postgres -d sma_portfolio_lab -t -A -c 'SELECT id FROM account;' 2>/dev/null); then
-            for c in $(docker ps -a | awk 'NR>1 {print $NF}' | grep -E "^mt5-${uuid_re}$" || true); do
-              cid=${c#mt5-}
-              if ! printf '%s\n' "$account_ids" | grep -qix "$cid"; then
-                docker rm -f "$c" >/dev/null 2>&1 && fixes+=("removed orphan terminal $c") || alerts+=("orphan terminal $c could not be removed")
-              fi
-            done
-            for v in $(docker volume ls -q | grep -E "^mt5-${uuid_re}-config$" || true); do
-              vid=${v#mt5-}; vid=${vid%-config}
-              if ! printf '%s\n' "$account_ids" | grep -qix "$vid"; then
-                docker volume rm "$v" >/dev/null 2>&1 && fixes+=("removed orphan terminal volume $v") || alerts+=("orphan terminal volume $v could not be removed")
-              fi
-            done
-          fi
-
-          # Every onboarded MT5 terminal container must be running too.
-          terminals=$(docker ps -a | awk 'NR>1 {print $NF}' | grep '^mt5-' || true)
-
-          for c in $required $terminals; do
-            if docker ps -q -f name="^${c}$" -f status=running | grep -q .; then
-              continue
-            fi
-            if docker ps -aq -f name="^${c}$" | grep -q .; then
-              docker start "$c" >/dev/null 2>&1 && fixes+=("restarted $c") || alerts+=("container $c down and restart FAILED")
-            else
-              alerts+=("container $c missing")
-            fi
-          done
-
-          # Live deployments on the engine, discovered from the snapshot
-          # files: new deployments are watched automatically and undeployed
-          # portfolios drop out on their own.
-          dep_summary="{}"
-          pids=$(docker exec sma-engine ls /app/data/deployments 2>/dev/null | sed -n 's/^portfolio_\([0-9][0-9]*\)\.json$/\1/p')
-          if [ -z "$pids" ]; then
-            alerts+=("engine: no deployment snapshots found")
-          fi
-          for pid in $pids; do
-            resp=$(curl -sf -m 10 -H "X-API-Key: $ENGINE_API_KEY" "http://127.0.0.1:8100/deployments/$pid/status" || true)
-            if [ -z "$resp" ]; then
-              alerts+=("deployment $pid: engine unreachable or no status")
-              continue
-            fi
-            op=$(echo "$resp" | jq -r '.operation_status // "unknown"')
-            hb=$(echo "$resp" | jq -r '.last_heartbeat_at // empty')
-            dep_summary=$(echo "$dep_summary" | jq --arg pid "$pid" --arg op "$op" --arg hb "$hb" '. + {($pid): {status: $op, heartbeat: $hb}}')
-            if [ "$op" != "running" ]; then
-              alerts+=("deployment $pid status: $op")
-              dep_error_seen=1
-            fi
-            if [ -n "$hb" ]; then
-              hb_age=$(( $(date -u +%s) - $(date -u -d "$hb" +%s 2>/dev/null || date -u +%s) ))
-              if [ "$hb_age" -gt 900 ]; then
-                alerts+=("deployment $pid heartbeat stale (${hb_age}s)")
-              fi
-            fi
-          done
-
-          # Auto-heal: a deployment stuck in error usually means a dead
-          # worker thread; an engine restart resumes every deployment from
-          # its snapshot (risk state persists on disk). Act only on the
-          # second consecutive sighting and at most once per 30 minutes.
-          if [ "${dep_error_seen:-0}" = "1" ]; then
-            if [ -f /opt/sma/.watchdog_dep_error ]; then
-              last_restart=$(cat /opt/sma/.watchdog_engine_restart 2>/dev/null || echo 0)
-              now_ts=$(date -u +%s)
-              if [ $(( now_ts - last_restart )) -gt 1800 ]; then
-                docker restart sma-engine >/dev/null 2>&1                   && fixes+=("restarted sma-engine to recover an errored deployment")                   || alerts+=("engine auto-restart FAILED")
-                echo "$now_ts" > /opt/sma/.watchdog_engine_restart
-                rm -f /opt/sma/.watchdog_dep_error
-              fi
-            else
-              touch /opt/sma/.watchdog_dep_error
-            fi
-          else
-            rm -f /opt/sma/.watchdog_dep_error
-          fi
-
-          # Memory: Wine terminals spike; with swap as the buffer, alert
-          # while there is still time to act.
-          mem_avail=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
-          if [ "$mem_avail" -lt 400 ]; then
-            alerts+=("low memory: ${mem_avail}MB available")
-          fi
-
-          # Disk.
-          disk_pct=$(df / --output=pcent | tail -1 | tr -dc '0-9')
-          if [ "$disk_pct" -gt 85 ]; then
-            alerts+=("disk at ${disk_pct}%")
-          fi
-
-          # Last backup freshness (< 26h).
-          latest_backup=$(ls -t {{ backup_dir }}/*.enc 2>/dev/null | head -1 || true)
-          if [ -n "$latest_backup" ]; then
-            backup_age=$(( $(date +%s) - $(stat -c %Y "$latest_backup") ))
-            if [ "$backup_age" -gt 93600 ]; then
-              alerts+=("last backup is $((backup_age/3600))h old")
-            fi
-          else
-            alerts+=("no backups found yet")
-          fi
-
-          alerts_text=$(printf '%s\n' "${alerts[@]:-}" | grep -v '^$' || true)
-          fixes_text=$(printf '%s\n' "${fixes[@]:-}" | grep -v '^$' || true)
-          ok=true
-          [ -n "$alerts_text" ] && ok=false
-          jq -n \
-            --arg checked_at "$(date -u +%FT%TZ)" \
-            --argjson ok "$ok" \
-            --arg alerts "$alerts_text" \
-            --arg fixes "$fixes_text" \
-            --argjson deployments "$dep_summary" \
-            --arg disk "${disk_pct}%" \
-            --arg mem "${mem_avail}MB" \
-            '{checked_at: $checked_at, ok: $ok,
-              alerts: ($alerts | split("\n") | map(select(. != ""))),
-              auto_fixes: ($fixes | split("\n") | map(select(. != ""))),
-              deployments: $deployments, disk: $disk, mem_available: $mem}' \
-            > {{ status_file }}.tmp && mv {{ status_file }}.tmp {{ status_file }}
-
-          # Telegram push on state change only.
-          state_hash=$(printf '%s' "${alerts[*]:-ok}" | md5sum | cut -d' ' -f1)
-          last_hash=$(cat /opt/sma/.watchdog_state 2>/dev/null || true)
-          if [ "$state_hash" != "$last_hash" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-            if [ -n "$alerts_text" ]; then
-              msg="SMA watchdog ALERT: ${alerts[*]}"
-            else
-              msg="SMA watchdog: all clear again."
-            fi
-            curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-              -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
-          fi
-          echo "$state_hash" > /opt/sma/.watchdog_state
-
-    - name: Install parity check (runs inside the backend container)
+    - name: Install parity check (from sma-portfolio-lab)
       ansible.builtin.copy:
-        src: ../files/parity_check.py
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/parity_check.py"
         dest: "{{ ops_dir }}/parity_check.py"
         mode: "0644"
 
-    - name: Install parity runner
+    - name: Install parity runner (from sma-portfolio-lab)
       ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/parity.sh"
         dest: "{{ ops_dir }}/parity.sh"
         mode: "0755"
-        content: |
-          #!/usr/bin/env bash
-          # Nightly live-vs-backtest parity monitor. Replays recent broker
-          # bars through each deployed leg's signal code and diffs against
-          # actual fills; alerts via Telegram when live entries have no
-          # matching backtest signal.
-          set -u
-          . /opt/sma/watchdog.env
-          out=/tmp/parity.json
-          if docker exec -i portfolio-lab-backend-1 python - < {{ ops_dir }}/parity_check.py > "$out" 2>/tmp/parity.err; then
-            mv "$out" /opt/sma/lab/parity.json
-            alerts=$(jq -r '.alerts[]?' /opt/sma/lab/parity.json)
-            if [ -n "$alerts" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-              msg="SMA parity monitor ALERT: $alerts"
-              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
-            fi
-          else
-            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-              msg="SMA parity monitor FAILED to run: $(tail -c 300 /tmp/parity.err)"
-              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
-            fi
-          fi
 
     - name: Schedule nightly parity check
       ansible.builtin.cron:
@@ -318,43 +138,17 @@
         hour: "3"
         job: "{{ ops_dir }}/parity.sh >/dev/null 2>&1"
 
-    - name: Install weekly comparison (runs inside the backend container)
+    - name: Install weekly comparison (from sma-portfolio-lab)
       ansible.builtin.copy:
-        src: ../files/weekly_report.py
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/weekly_report.py"
         dest: "{{ ops_dir }}/weekly_report.py"
         mode: "0644"
 
-    - name: Install weekly comparison runner
+    - name: Install weekly comparison runner (from sma-portfolio-lab)
       ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/weekly.sh"
         dest: "{{ ops_dir }}/weekly.sh"
         mode: "0755"
-        content: |
-          #!/usr/bin/env bash
-          # Weekly live-vs-backtest P&L comparison. Backtests the trading
-          # week per deployed leg and diffs against actual results; always
-          # sends a Telegram summary.
-          set -u
-          . /opt/sma/watchdog.env
-          out=/tmp/weekly.json
-          if docker exec -i portfolio-lab-backend-1 python - < {{ ops_dir }}/weekly_report.py > "$out" 2>/tmp/weekly.err; then
-            mv "$out" /opt/sma/lab/weekly-report.json
-            summary=$(jq -r '.deployments | to_entries[] | "\(.value.portfolio | .[0:34]): live \(.value.live_pnl) vs sim \(.value.sim_pnl) (d \(.value.pnl_delta))"' /opt/sma/lab/weekly-report.json)
-            issues=$(jq -r '.alerts[]?' /opt/sma/lab/weekly-report.json | head -6)
-            msg="SMA weekly live-vs-backtest: $summary"
-            if [ -n "$issues" ]; then
-              msg="$msg -- FLAGS: $issues"
-            fi
-            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
-            fi
-          else
-            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-              msg="SMA weekly comparison FAILED to run: $(tail -c 300 /tmp/weekly.err)"
-              curl -sf -m 10 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode text="$msg" >/dev/null || true
-            fi
-          fi
 
     - name: Schedule weekly comparison (Saturday morning)
       ansible.builtin.cron:
@@ -376,10 +170,6 @@
         name: sma-watchdog
         minute: "*/5"
         job: "{{ ops_dir }}/watchdog.sh >/dev/null 2>&1"
-
-    - name: Run an immediate backup
-      ansible.builtin.command: "{{ ops_dir }}/backup.sh"
-      changed_when: true
 
     - name: Run the watchdog once now
       ansible.builtin.command: "{{ ops_dir }}/watchdog.sh"

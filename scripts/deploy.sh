@@ -11,11 +11,28 @@
 #   ./deploy.sh all
 set -euo pipefail
 
-HOST="root@167.71.162.75"
-KEY="$HOME/.ssh/id_ed25519_github"
+HOST="${SMA_DEPLOY_HOST:-root@167.71.162.75}"
+# Dedicated deploy key (Phase 0, 2026-08-21) — no longer the GitHub key.
+KEY="${SMA_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_sma_deploy}"
 LAB="$(cd "$(dirname "$0")/../../sma-portfolio-lab" && pwd)"
 ENGINE="$(cd "$(dirname "$0")/../../sma-execution-node" && pwd)"
 SSH=(ssh -i "$KEY" "$HOST")
+
+# Production must be reproducible from git. Refuse a dirty tree unless the
+# operator explicitly overrides (ALLOW_DIRTY=1), and record the deployed
+# commit on the host so "what is live" is a fact, not a memory.
+require_clean() { # $1 repo dir  $2 label
+  local dir="$1" label="$2"
+  if [ -n "$(git -C "$dir" status --porcelain)" ] && [ "${ALLOW_DIRTY:-0}" != "1" ]; then
+    echo "REFUSED: $label has uncommitted changes. Commit (and tag) first, or ALLOW_DIRTY=1." >&2
+    git -C "$dir" status --short | head -20 >&2
+    exit 2
+  fi
+  local sha
+  sha="$(git -C "$dir" rev-parse --short HEAD)"
+  echo "== $label @ $sha$( [ "${ALLOW_DIRTY:-0}" = "1" ] && echo ' (DIRTY OVERRIDE)')"
+  "${SSH[@]}" "mkdir -p /opt/sma/deployed && echo '$sha $(date -u +%FT%TZ) $(git -C "$dir" describe --tags --always)' >> /opt/sma/deployed/$label.log"
+}
 
 replace_tree() { # $1 container  $2 local_dir  $3 remote_parent  $4 tree_name
   local container="$1" local_dir="$2" parent="$3" tree="$4"
@@ -38,6 +55,7 @@ replace_tree() { # $1 container  $2 local_dir  $3 remote_parent  $4 tree_name
 }
 
 deploy_backend() {
+  require_clean "$LAB" portfolio-lab
   echo "== backend: clean replace app/ + tests/ + scripts/, restart"
   replace_tree portfolio-lab-backend-1 "$LAB/backend" /app/backend app
   replace_tree portfolio-lab-backend-1 "$LAB/backend" /app/backend tests
@@ -50,6 +68,7 @@ deploy_backend() {
 }
 
 deploy_engine() {
+  require_clean "$ENGINE" execution-node
   echo "== engine: clean replace src/ + tests/, restart"
   replace_tree sma-engine "$ENGINE" /app src
   replace_tree sma-engine "$ENGINE" /app tests
@@ -58,6 +77,7 @@ deploy_engine() {
 }
 
 deploy_frontend() {
+  require_clean "$LAB" portfolio-lab
   echo "== frontend: rsync --delete src/, image rebuild"
   rsync -az --delete -e "ssh -i $KEY" "$LAB/frontend/src/" "$HOST:/opt/sma/portfolio-lab/frontend/src/"
   "${SSH[@]}" "cd /opt/sma/portfolio-lab && \
