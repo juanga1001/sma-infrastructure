@@ -63,9 +63,10 @@
           # Localhost only: the Caddy TLS front is the sole public entry.
           - "127.0.0.1:{{ engine_port }}:8100"
         volumes:
-          - "/var/run/docker.sock:/var/run/docker.sock"
           - "sma-engine-data:/app/data"
         env:
+          # Docker API only through the scoped proxy (see deploy-docker-proxy.yml).
+          DOCKER_HOST: tcp://sma-docker-proxy:2375
           SMA_ENGINE_API_KEY: "{{ engine_api_key }}"
 
     - name: Wait for engine health

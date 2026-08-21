@@ -1,0 +1,37 @@
+---
+# Scoped Docker socket proxy (Phase 1, 2026-08-21). The engine and the
+# orchestrator used to mount /var/run/docker.sock read-write as root: any
+# RCE in either (the engine executes published strategy code) was host
+# root. They now reach Docker over tcp://sma-docker-proxy:2375, which only
+# forwards the API sections they need and runs with the socket read-only.
+- name: Deploy the scoped Docker socket proxy on the MT5 host
+  hosts: mt5_hosts
+  become: true
+  vars:
+    proxy_container: sma-docker-proxy
+    mt5_network: sma-mt5-net
+  tasks:
+    - name: Run docker-socket-proxy (control-plane network only, no published ports)
+      community.docker.docker_container:
+        name: "{{ proxy_container }}"
+        image: tecnativa/docker-socket-proxy:0.3
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ mt5_network }}"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+        env:
+          # Needed by engine (inspect, exec) and orchestrator (run/remove
+          # containers, volumes, per-account networks, helper images).
+          CONTAINERS: "1"
+          EXEC: "1"
+          NETWORKS: "1"
+          VOLUMES: "1"
+          IMAGES: "1"
+          INFO: "1"
+          POST: "1"
+          DELETE: "1"
+          # Everything else stays denied: AUTH, BUILD, COMMIT, CONFIGS,
+          # DISTRIBUTION, EVENTS, NODES, PLUGINS, SECRETS, SERVICES,
+          # SESSION, SWARM, SYSTEM, TASKS.

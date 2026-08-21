@@ -72,8 +72,9 @@
           # Localhost only: the Caddy TLS front is the sole public entry.
           - "127.0.0.1:{{ orchestrator_port }}:8000"
         volumes:
-          - "/var/run/docker.sock:/var/run/docker.sock"
         env:
+          # Docker API only through the scoped proxy (see deploy-docker-proxy.yml).
+          DOCKER_HOST: tcp://sma-docker-proxy:2375
           SMA_ORCHESTRATOR_API_KEY: "{{ orchestrator_api_key }}"
           SMA_VNC_TOKEN_SECRET: "{{ vnc_token_secret }}"
           SMA_MT5_IMAGE: "{{ mt5_image_name }}"
