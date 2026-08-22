@@ -64,6 +64,13 @@
           - "127.0.0.1:{{ engine_port }}:8100"
         volumes:
           - "sma-engine-data:/app/data"
+        # journald: the log must outlive the container. `docker rm -f` on a
+        # json-file container deletes its history (2026-08-22: Friday's
+        # incident log was gone by Saturday). Read with
+        # `journalctl CONTAINER_NAME=sma-engine`; `docker logs` still works.
+        log_driver: journald
+        log_options:
+          tag: "{{ engine_container }}"
         env:
           # Docker API only through the scoped proxy (see deploy-docker-proxy.yml).
           DOCKER_HOST: tcp://sma-docker-proxy:2375
