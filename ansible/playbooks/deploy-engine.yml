@@ -68,6 +68,9 @@
         # json-file container deletes its history (2026-08-22: Friday's
         # incident log was gone by Saturday). Read with
         # `journalctl CONTAINER_NAME=sma-engine`; `docker logs` still works.
+        # `docker restart`/stop grace: workers join mid-tick (orders, flatten
+        # retries); the 10 s default SIGKILLed them with entries unrecorded.
+        stop_timeout: 120
         log_driver: journald
         log_options:
           tag: "{{ engine_container }}"
