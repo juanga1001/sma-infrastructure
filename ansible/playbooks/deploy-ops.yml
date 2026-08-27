@@ -165,6 +165,20 @@
         hour: "3"
         job: "{{ ops_dir }}/backup.sh >> {{ backup_dir }}/backup.log 2>&1"
 
+    - name: Install weekend restart script (from sma-portfolio-lab)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/weekend_restart.sh"
+        dest: "{{ ops_dir }}/weekend_restart.sh"
+        mode: "0755"
+
+    - name: Schedule weekend terminal+engine restart (Saturday, markets closed)
+      ansible.builtin.cron:
+        name: sma-weekend-restart
+        minute: "37"
+        hour: "9"
+        weekday: "6"
+        job: "{{ ops_dir }}/weekend_restart.sh >> /opt/sma/ops/weekend-restart.log 2>&1"
+
     - name: Schedule watchdog every 5 minutes
       ansible.builtin.cron:
         name: sma-watchdog
