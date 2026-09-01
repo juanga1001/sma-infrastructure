@@ -165,6 +165,15 @@
         hour: "3"
         job: "{{ ops_dir }}/backup.sh >> {{ backup_dir }}/backup.log 2>&1"
 
+    - name: Install operator password-reset wrapper
+      ansible.builtin.copy:
+        dest: "{{ ops_dir }}/set-password.sh"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          # Operator password reset: set-password.sh <email> [--generate]
+          exec docker exec -it portfolio-lab-backend-1 python /app/backend/scripts/set_password.py "$@"
+
     - name: Install weekend restart script (from sma-portfolio-lab)
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../../../sma-portfolio-lab/backend/scripts/weekend_restart.sh"
